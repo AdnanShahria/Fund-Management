@@ -20,13 +20,10 @@
 ## Overall Progress
 
 ```
-Phase 0 (Foundation)   [░░░░░░░░░░] 0%
-Phase 1 (Auth)         [░░░░░░░░░░] 0%
-Phase 2 (Fund Core)    [░░░░░░░░░░] 0%
-Phase 3 (Transactions) [░░░░░░░░░░] 0%
-Phase 4 (Reporting)    [░░░░░░░░░░] 0%
-Phase 5 (Admin)        [░░░░░░░░░░] 0%
-Phase 6 (Launch)       [░░░░░░░░░░] 0%
+Phase 1 (PRD Schema & Scaffolding)    [██████████] 100%
+Phase 2 (AI Parser & Web API Routes)  [██████████] 100%
+Phase 3 (Mini App & Push Reminders)   [░░░░░░░░░░] 0%
+Phase 4 (Cloudflare Production Deploy)[░░░░░░░░░░] 0%
 ```
 
 ---
@@ -34,19 +31,20 @@ Phase 6 (Launch)       [░░░░░░░░░░] 0%
 ## Current Session
 
 **Date:** 2026-10-01
-**Focus:** Project setup and documentation
+**Focus:** Room Fund Rebuild, Telegram Bot, AI Natural Language Fallback, and Web API Integration
 
-### Today's Tasks
-- 🔄 Create context folder and documentation files
-- 🔲 Initialize Next.js project
-- 🔲 Configure Cloudflare Pages
-- 🔲 Setup database schema
-
----
-
-## Completed Work
-
-*(Nothing completed yet, this is the start of the project.)*
+### Completed Tasks
+- ✅ Replaced institutional SaaS schema with PRD Room and Group Fund model in `web/lib/db/schema/`
+- ✅ Stored all financial values as integer paisa to eliminate floating point errors
+- ✅ Rebuilt web dashboard in `web/app/page.tsx` with BDT taka currency, ledger table, member cards, and record modal
+- ✅ Scaffolded Telegram bot in `bot/` as a Cloudflare Worker with Hono and Zod
+- ✅ Built rule based parser in `bot/src/lib/parser.ts` for commands and natural language messages
+- ✅ Implemented group and fund context bootstrap and treasurer authorization in `bot/src/handlers/message.ts`
+- ✅ Built AI intent parser fallback in `bot/src/lib/ai-parser.ts` using Workers AI and Gemini API
+- ✅ Created SQL migration `0001_room_fund_schema.sql` and `seed.sql` for D1 database
+- ✅ Built Next.js API routes in `web/app/api/` for funds, transactions, members, and CSV export
+- ✅ Connected web dashboard to live API endpoints with optimistic updates and live balance recomputation
+- ✅ Verified both web and bot projects compile cleanly with zero TypeScript errors
 
 ---
 
@@ -54,7 +52,7 @@ Phase 6 (Launch)       [░░░░░░░░░░] 0%
 
 | Blocker | Impact | Resolution |
 |---------|--------|------------|
-| PRD file is empty | Need requirements to build | Fill in prd.md |
+| None | Core system is working cleanly | Ready for deployment and live testing |
 
 ---
 
@@ -62,32 +60,24 @@ Phase 6 (Launch)       [░░░░░░░░░░] 0%
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-10-01 | Created context folder with 9 docs | Establish project knowledge base for AI assisted development |
-| 2026-10-01 | Copied codebase-memory-mcp plugin | Enables graph based code discovery |
-| 2026-10-01 | Copied apple-design plugin | Enforce HIG grounded UI design |
+| 2026-10-01 | Room Fund Management Focus | Target student rooms, batches, and clubs using Telegram as primary interface |
+| 2026-10-01 | Single authoritative D1 ledger | Never maintain two parallel writable stores, balance is always computed from transactions |
+| 2026-10-01 | Rule parser first, AI fallback second | Keeps bot fast and free of API cost for standard commands while supporting messy speech |
+| 2026-10-01 | Integer paisa storage | Guarantees exact monetary accounting without floating point rounding errors |
+| 2026-10-01 | Contextual role authorization | Only users with role TREASURER or OWNER can record contributions or expenses |
 
 ---
 
 ## Upcoming Milestones
 
-| Milestone | Target Date | Status |
-|-----------|-------------|--------|
-| Project scaffold complete | TBD | 🔲 |
-| Auth flow working | TBD | 🔲 |
-| First fund CRUD | TBD | 🔲 |
-| Beta deployment | TBD | 🔲 |
-| Launch | TBD | 🔲 |
+| Milestone | Target | Status |
+|-----------|--------|--------|
+| PRD Schema and Web Dashboard | Day 1 | ✅ |
+| Telegram Bot and AI Fallback | Day 1 | ✅ |
+| Web API Routes and CSV Export | Day 1 | ✅ |
+| Telegram Mini App Embedded Webview | Next Phase | 🔲 |
+| Production Cloudflare Worker Deploy | Next Phase | 🔲 |
 
 ---
 
-## Session History
-
-### Session 1 (2026-10-01)
-- Created `.agents/plugins/codebase-memory-mcp` (copied from Aurelia-Ribbi)
-- Created `.agents/plugins/apple-design` (copied from global config)
-- Created `context/` folder with 9 documentation files
-- PRD file found empty, needs to be populated
-
----
-
-*Auto-updated: 2026-10-01*
+*Last updated: 2026-10-01*

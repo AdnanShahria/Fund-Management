@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Next.js build output
+.next/
+*/.next/
+out/
+*/out/
+
+# Cloudflare Wrangler state
+.wrangler/
+*/.wrangler/
+
+# Environment files
+.env*.local
+.env
+!web/.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

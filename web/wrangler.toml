@@ -1,0 +1,10 @@
+name = "orbit-fund-management"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "orbit-fund-management-db"
+database_id = "local-d1-id"
+migrations_dir = "drizzle/migrations"

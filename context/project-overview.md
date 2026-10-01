@@ -1,4 +1,4 @@
-# Project Overview: Fund Management Platform
+# Project Overview: Fund Management
 
 > [!NOTE]
 > This is the north star document for the project. Read this first before working on any feature.
@@ -7,36 +7,36 @@
 
 ## Product Vision
 
-Orbit Fund Management is a next generation SaaS platform for alternative investment fund managers. It provides a unified workspace for managing fund operations, from investor onboarding and capital account tracking to NAV calculations, transaction processing, and regulatory reporting.
+Fund Management is a Telegram-first group fund management platform for rooms, batches, clubs, departments, and other organized communities. It gives any group a transparent, shared financial ledger without needing spreadsheets or accounting software.
+
+**Primary interface:** Telegram Bot
+**Secondary interface:** Web Dashboard (Next.js) and Telegram Mini App
+
+**Primary currency:** BDT (Bangladeshi Taka, ৳)
 
 **Target Users:**
-- Fund Managers (primary operators)
-- Fund Analysts (data entry and reporting)
-- Investors (self service portal, read only)
-- Compliance Officers (reporting and audit)
-- Platform Admins (super admin operations)
+- Room / group Treasurer (records contributions and expenses)
+- Group Owner (administers the fund and assigns roles)
+- Members (read only: view balance, history, reports)
+- Viewers (same as member, no group membership required)
 
 ---
 
 ## Problem Statement
 
-Fund managers today rely on a fragmented mix of Excel spreadsheets, generic CRM tools, and expensive legacy fund administration software. This creates:
+Small groups (rooms, batches, clubs) manage shared money through Telegram messages, Google Sheets, and paper notebooks. This causes:
 
-1. **Operational risk**: Manual data entry errors in NAV calculations
-2. **Compliance risk**: Inconsistent investor reporting and audit trails
-3. **Scalability limits**: Spreadsheets break down beyond 50 investors per fund
-4. **Poor investor experience**: No self service portal for capital account statements
+1. Missing transactions and duplicate entries
+2. Calculation errors and no audit trail
+3. Lack of accountability between members
+4. Difficult historical lookup and reporting
+5. No access control to prevent unauthorized edits
 
 ---
 
 ## Solution
 
-A multi tenant, cloud native fund administration platform that:
-- Automates NAV calculations and capital account updates
-- Provides real time fund dashboards for managers and analysts
-- Delivers a branded investor portal with statement downloads
-- Generates regulatory grade reports (CSV, PDF, XML)
-- Maintains a complete, immutable audit trail of all transactions
+A Telegram bot that accepts natural language and commands to record contributions and expenses, backed by a Cloudflare D1 ledger. A web dashboard handles complex administration, filtering, charts, and bulk actions where a graphical interface is more efficient.
 
 ---
 
@@ -44,12 +44,29 @@ A multi tenant, cloud native fund administration platform that:
 
 | Attribute | Value |
 |-----------|-------|
-| Product Name | Orbit Fund Management |
-| Project Code | FM-001 |
-| Product Stage | Pre MVP |
-| Business Model | SaaS (per seat plus AUM based pricing) |
-| Primary Market | Southeast Asia (SG, MY, ID) |
-| Target ARR | TBD |
+| Product Name | Fund Management |
+| Primary Interface | Telegram Bot |
+| Backend | Cloudflare Workers + Hono |
+| Database | Cloudflare D1 (SQLite) |
+| ORM | Drizzle ORM |
+| Frontend | Next.js (web dashboard) |
+| Currency | BDT (Bangladeshi Taka) |
+| Target Cost | $0/month for MVP |
+| Primary Market | University rooms, batches, clubs (Bangladesh) |
+
+---
+
+## Product Hierarchy
+
+```
+Organization
+    ↓
+Group (batch, room, department, club)
+    ↓
+Fund (general, room, tour, event, emergency)
+```
+
+A group may contain multiple funds. The same user can have different roles across funds.
 
 ---
 
@@ -57,38 +74,68 @@ A multi tenant, cloud native fund administration platform that:
 
 | Module | Description | Priority |
 |--------|-------------|----------|
-| **Fund Management** | Fund CRUD, share classes, NAV | P0 |
-| **Investor Management** | Profiles, KYC, capital accounts | P0 |
-| **Transaction Engine** | Subscriptions, redemptions, transfers | P0 |
-| **Reporting** | Statements, performance reports, exports | P1 |
-| **Document Vault** | Upload, storage, versioning | P1 |
-| **Investor Portal** | Self service investor dashboard | P1 |
-| **Admin Console** | Tenant and platform config | P2 |
-| **Notifications** | Email, in app, webhooks | P2 |
+| **Telegram Bot** | Commands, natural language, confirmations | P0 |
+| **Rule-Based Parser** | Parses /add, /expense, NL messages | P0 |
+| **Transaction Ledger** | CONTRIBUTION, EXPENSE, REFUND, REVERSAL | P0 |
+| **Web Dashboard** | Balance, ledger table, member list, charts | P0 |
+| **Role-Based Access** | Owner, Treasurer, Member, Viewer | P0 |
+| **Idempotency** | Telegram webhook deduplication | P0 |
+| **AI Parser** | Fallback when rule-based parser fails | P1 |
+| **Reporting** | Monthly reports, member breakdown, export | P1 |
+| **Audit Logs** | Immutable record of every financial mutation | P1 |
+| **Telegram Mini App** | Dashboard embedded in Telegram | P2 |
+| **Notifications** | Monthly reminders, contribution requests | P2 |
 
 ---
 
-## Success Metrics
+## Key Engineering Rules
 
-| Metric | Target |
-|--------|--------|
-| Onboard first fund | Week 4 |
-| Process first subscription transaction | Week 6 |
-| Generate first investor statement | Week 8 |
-| 99.9% uptime SLA | Launch |
-| Less than 2s page load (P95) | Launch |
-| WCAG 2.1 AA compliance | Launch |
+1. Cloudflare D1 is the single authoritative financial source. Never two writable stores.
+2. All financial amounts stored as integer paisa (BDT cents) to avoid floating point.
+3. Balance is always computed from the ledger. Never stored as a materialized field.
+4. Every financial mutation produces an audit record.
+5. Telegram webhook processing is idempotent. Check `telegram_updates` before inserting.
+6. Authorization is server-side always. Roles are contextual: `User × Group × Fund × Role`.
+7. AI is an interpretation layer only. It must not write to the DB directly.
+8. The system must remain functional without AI for basic operations.
 
 ---
 
-## Team & Contacts
+## Data Model (Summary)
 
-| Role | Name | Contact |
-|------|------|---------|
-| Product Owner | TBD | Unassigned |
-| Lead Engineer | TBD | Unassigned |
-| Designer | TBD | Unassigned |
-| QA | TBD | Unassigned |
+| Table | Purpose |
+|-------|---------|
+| `users` | Telegram identity, display name |
+| `organizations` | Top-level institution |
+| `groups` | Batch, room, club, etc. Linked to Telegram chat via `telegram_chat_id` |
+| `funds` | Financial ledger per group |
+| `memberships` | User × group × fund × role |
+| `transactions` | All financial entries. Amount in paisa (integer). |
+| `audit_logs` | Immutable log of every write operation |
+| `telegram_updates` | Processed update IDs for idempotency |
+
+---
+
+## Bot Commands
+
+**General (any member):**
+- `/start` — onboarding
+- `/balance` — current balance
+- `/summary` — full fund summary
+- `/history` — recent transactions
+- `/members` — member list with contributions
+
+**Treasurer / Owner only:**
+- `/add <name> <amount>` — record contribution
+- `/expense <amount> <category>` — record expense
+- `/reverse <tx-id>` — reverse a transaction
+- `/addmember`, `/removemember` — membership management
+- `/export` — export records
+
+**Natural language also works:**
+- `Murad gave 300 tk`
+- `We spent 150 on grocery`
+- `Adnan contributed 200, Rahim contributed 300`
 
 ---
 
@@ -97,22 +144,7 @@ A multi tenant, cloud native fund administration platform that:
 | Document | Location |
 |----------|----------|
 | PRD | [`/prd.md`](../prd.md) |
-| Architecture | [`/context/architecture.md`](./architecture.md) |
-| Build Plan | [`/context/build-plan.md`](./build-plan.md) |
 | Code Standards | [`/context/codestandard.md`](./codestandard.md) |
-| UI Rules | [`/context/ui-rules.md`](./ui-rules.md) |
-| UI Tokens | [`/context/ui-tokens.md`](./ui-tokens.md) |
-| Progress | [`/context/progress-tracker.md`](./progress-tracker.md) |
-
----
-
-## Key Assumptions
-
-1. Users are professionals, so prioritize power user features over simplicity
-2. Data accuracy is critical, so all financial calculations use `Decimal.js`
-3. Multi tenancy is a core requirement, so every database query must scope by `orgId`
-4. The platform will undergo SOC 2 Type II audits in the future, so build with audit trails from day one
-5. Regulatory requirements vary by jurisdiction, so the system must stay configurable
 
 ---
 
