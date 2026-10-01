@@ -1,15 +1,7 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 
 export const runtime = "edge";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "FundBot | Room Fund Manager",
@@ -25,12 +17,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <head>
-        <Script
-          src="https://telegram.org/js/telegram-web-app.js"
-          strategy="beforeInteractive"
+        {/* Google Fonts loaded via plain link tag (next/font/google is not supported in Edge Runtime) */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
         />
+        {/* Telegram Web App SDK */}
+        <script src="https://telegram.org/js/telegram-web-app.js" async />
       </head>
-      <body className={`${inter.variable} font-sans antialiased h-full`}>
+      <body className="font-sans antialiased h-full">
         {children}
       </body>
     </html>
