@@ -1,0 +1,211 @@
+# Library Documentation: Fund Management Platform
+
+> [!NOTE]
+> This file is the canonical reference for every major library used in this project. Consult it before installing new packages.
+
+---
+
+## Core Framework
+
+### Next.js 14 (App Router)
+- **Docs**: https://nextjs.org/docs
+- **Version**: `^14.x`
+- **Usage**: Full stack React framework. Use App Router exclusively, with no Pages Router.
+- **Key APIs**:
+  - `app/` directory for routing
+  - `loading.tsx` and `error.tsx` for stream UI
+  - `unstable_cache` for data caching
+  - Server Actions for mutations
+
+### React 18
+- **Docs**: https://react.dev
+- **Version**: `^18.x`
+- **Key features in use**: Server Components, Suspense, `useTransition`, `startTransition`
+
+---
+
+## UI & Styling
+
+### Tailwind CSS
+- **Docs**: https://tailwindcss.com/docs
+- **Version**: `^3.x`
+- **Config**: `tailwind.config.ts`
+- **Usage**: Utility first styling. All custom design tokens live in `context/ui-tokens.md`.
+
+### shadcn/ui
+- **Docs**: https://ui.shadcn.com
+- **Version**: Latest (installed via CLI)
+- **Usage**: Accessible component primitives. Never modify files in `components/ui/` directly. Use the `className` prop for overrides.
+- **Install new component**: `npx shadcn-ui@latest add <component>`
+
+### Lucide React
+- **Docs**: https://lucide.dev
+- **Version**: `^0.x`
+- **Usage**: Icon library. Use named imports, for example: `import { TrendingUp } from 'lucide-react'`
+
+### Recharts
+- **Docs**: https://recharts.org
+- **Version**: `^2.x`
+- **Usage**: Data visualization for fund performance charts and NAV history graphs.
+
+---
+
+## Authentication
+
+### Clerk
+- **Docs**: https://clerk.com/docs
+- **Version**: `@clerk/nextjs ^5.x`
+- **Usage**:
+  - `<ClerkProvider>` wraps the root layout
+  - `auth()` (server) and `useAuth()` (client) for session data
+  - `currentUser()` for full user object
+  - `OrganizationSwitcher` for multi tenant UI
+- **Middleware**: `middleware.ts` at project root protects routes
+
+```typescript
+// middleware.ts
+import { authMiddleware } from "@clerk/nextjs";
+export default authMiddleware({
+  publicRoutes: ["/", "/sign-in", "/sign-up"],
+});
+```
+
+---
+
+## Database & ORM
+
+### Drizzle ORM
+- **Docs**: https://orm.drizzle.team
+- **Version**: `^0.x`
+- **Config**: `drizzle.config.ts`
+- **Schema**: `lib/db/schema/`
+- **Migrations**: `lib/db/migrations/`
+- **Commands**:
+  ```bash
+  npx drizzle-kit generate  # generate migration
+  npx drizzle-kit migrate   # run migrations
+  npx drizzle-kit studio    # visual DB browser
+  ```
+
+### PostgreSQL (via Neon / Supabase)
+- **Adapter**: `drizzle-orm/neon-http` or `drizzle-orm/node-postgres`
+- **Connection**: `DATABASE_URL` environment variable
+
+---
+
+## Validation
+
+### Zod
+- **Docs**: https://zod.dev
+- **Version**: `^3.x`
+- **Usage**: Schema validation for API inputs, form data, and environment variables.
+
+```typescript
+import { z } from 'zod'
+
+export const FundSchema = z.object({
+  name: z.string().min(1, 'Name required').max(100),
+  currency: z.enum(['USD', 'EUR', 'GBP', 'SGD']),
+  inceptionDate: z.coerce.date(),
+})
+
+export type FundInput = z.infer<typeof FundSchema>
+```
+
+---
+
+## Forms
+
+### React Hook Form
+- **Docs**: https://react-hook-form.com
+- **Version**: `^7.x`
+- **Usage**: Form state management. Always pair with Zod via `@hookform/resolvers/zod`.
+
+```tsx
+const form = useForm<FundInput>({
+  resolver: zodResolver(FundSchema),
+  defaultValues: { name: '', currency: 'USD' },
+})
+```
+
+---
+
+## Storage & Files
+
+### Cloudflare R2
+- **Docs**: https://developers.cloudflare.com/r2
+- **SDK**: `@aws-sdk/client-s3` (S3 compatible)
+- **Usage**: Store fund documents, investor statements, and regulatory reports.
+- **Upload pattern**: Generate presigned upload URL server side, then client uploads directly to R2.
+
+---
+
+## PDF Generation
+
+### @react-pdf/renderer
+- **Docs**: https://react-pdf.org
+- **Version**: `^3.x`
+- **Usage**: Generate fund statements and investor reports as PDFs.
+- **Note**: Must run in a Node.js context (API route or Server Action), not at the edge.
+
+---
+
+## Email
+
+### Resend
+- **Docs**: https://resend.com/docs
+- **Version**: `^3.x`
+- **Usage**: Transactional emails (welcome, statement ready, transaction confirmed).
+- **Templates**: React Email components in `emails/` directory.
+
+---
+
+## Error Monitoring
+
+### Sentry
+- **Docs**: https://docs.sentry.io/platforms/javascript/guides/nextjs
+- **Version**: `@sentry/nextjs ^8.x`
+- **Config**: `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
+
+---
+
+## Date Handling
+
+### date-fns
+- **Docs**: https://date-fns.org
+- **Version**: `^3.x`
+- **Usage**: Date formatting, arithmetic, NAV date calculations.
+- **Note**: Always use UTC for financial date calculations.
+
+---
+
+## Utilities
+
+| Package | Purpose | Docs |
+|---------|---------|------|
+| `clsx` + `tailwind-merge` | Conditional classnames | https://github.com/dcastil/tailwind-merge |
+| `numeral` | Number formatting (currency, %) | http://numeraljs.com |
+| `decimal.js` | Precise decimal arithmetic for NAV | https://mikemcl.github.io/decimal.js |
+| `nanoid` | Compact unique IDs | https://github.com/ai/nanoid |
+
+```typescript
+// Always use Decimal for financial calculations
+import Decimal from 'decimal.js'
+const nav = new Decimal('1234567.89').plus('456.11').toString()
+```
+
+---
+
+## Dev Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `@types/node` | Node.js type definitions |
+| `drizzle-kit` | DB schema management CLI |
+| `@playwright/test` | E2E testing |
+| `vitest` | Unit testing |
+| `@testing-library/react` | Component testing |
+
+---
+
+*Last updated: 2026-10-01*

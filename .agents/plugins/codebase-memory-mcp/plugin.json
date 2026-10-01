@@ -1,0 +1,5 @@
+{
+  "name": "codebase-memory-mcp",
+  "version": "0.9.0",
+  "description": "Codebase intelligence engine and persistent structural knowledge graph using tree-sitter"
+}
