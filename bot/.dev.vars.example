@@ -4,6 +4,12 @@
 # Telegram bot token from @BotFather
 BOT_TOKEN=your_telegram_bot_token_here
 
+# Web API endpoint URL for remote fund ledger synchronization (hosted on Cloudflare Pages)
+WEB_API_URL=http://localhost:3002
+
+# Bot API Secret Key matching BOT_API_KEY on the web server
+BOT_API_KEY=your_secure_bot_api_key_here
+
 # NVIDIA NIM API key for natural language fallback parsing
 NVIDIA_API_KEY=your_nvidia_nim_api_key_here
 NVIDIA_MODEL=meta/llama-3.2-11b-vision-instruct

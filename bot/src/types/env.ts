@@ -1,13 +1,19 @@
 /**
  * Cloudflare Worker environment bindings.
- * Each binding declared in wrangler.toml gets a typed property here.
+ * Every binding declared in wrangler.toml gets a typed property here.
  */
 export interface Env {
-  // D1 database — authoritative financial ledger
+  // D1 database (authoritative financial ledger)
   DB: D1Database;
 
-  // Telegram Bot token from @BotFather, stored as a secret
+  // Telegram Bot token from @BotFather, stored as a secret in env
   BOT_TOKEN: string;
+
+  // Web API endpoint URL for remote fund ledger synchronization
+  WEB_API_URL?: string;
+
+  // Bot API Secret Key for authenticating against the Web API endpoints
+  BOT_API_KEY?: string;
 
   // Optional Cloudflare Workers AI binding
   AI?: any;

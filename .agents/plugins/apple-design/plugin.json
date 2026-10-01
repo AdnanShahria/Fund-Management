@@ -1,0 +1,12 @@
+{
+  "name": "apple-design",
+  "version": "1.0.0",
+  "description": "Cross-platform UI/UX design reviewer grounded in Apple's Human Interface Guidelines (HIG). Use for auditing, reviewing, critiquing, or improving mobile and desktop app designs.",
+  "skills": [
+    {
+      "name": "apple-design",
+      "path": "SKILL.md",
+      "description": "HIG-grounded design review for iOS, macOS, Flutter, React Native, and Electron apps."
+    }
+  ]
+}

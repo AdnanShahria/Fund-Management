@@ -7,6 +7,10 @@ import {
   getMembers,
   addMember,
   exportTransactionsCsv,
+  reverseTransaction,
+  resetLedger,
+  verifyAdminSecret,
+  verifyBotApiKey,
 } from "../lib/db/ledger-service.ts";
 
 test("getFundSummary: computes initial balance and reserves correctly", async () => {
@@ -147,4 +151,40 @@ test("exportTransactionsCsv: generates well formed CSV formatted data", async ()
   const firstDataRow = lines[1];
   assert.ok(firstDataRow);
   assert.ok(firstDataRow.includes("BDT") || firstDataRow.split(",").length >= 7);
+});
+
+test("reverseTransaction: safely reverses transaction and adds compensating entry", async () => {
+  const tx = await createTransaction({
+    type: "CONTRIBUTION",
+    memberName: "Adnan Shahria",
+    amountPaisa: 5000,
+    description: "Temporary contribution to test reversal",
+  });
+
+  const reversal = await reverseTransaction(tx.id, "Admin");
+  assert.equal(reversal.success, true);
+  assert.equal(reversal.reversedTx?.status, "reversed");
+  assert.ok(reversal.correctionTx);
+  assert.equal(reversal.correctionTx.amountPaisa, -5000);
+});
+
+test("resetLedger: switches between room fund and batch fund modes", async () => {
+  const batchFund = await resetLedger("BATCH");
+  assert.equal(batchFund.fundType, "BATCH");
+  assert.equal(batchFund.name, "CSE Batch 2024 Central Fund");
+
+  const roomFund = await resetLedger("ROOM");
+  assert.equal(roomFund.fundType, "ROOM");
+  assert.equal(roomFund.name, "Room 302 General Fund");
+});
+
+test("verifyAdminSecret and verifyBotApiKey: check keys accurately", async () => {
+  const validAdmin = verifyAdminSecret("fundadmin2026");
+  assert.equal(validAdmin, true);
+
+  const invalidAdmin = verifyAdminSecret("wrongpassword");
+  assert.equal(invalidAdmin, false);
+
+  const validBot = verifyBotApiKey("bot-secret-key-2026");
+  assert.equal(validBot, true);
 });

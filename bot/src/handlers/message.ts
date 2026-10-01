@@ -3,6 +3,7 @@ import type { TelegramMessage, TelegramUser } from "../types/telegram";
 import { sendMessage, formatTaka } from "../lib/telegram";
 import { ruleBasedParse } from "../lib/parser";
 import { aiParse } from "../lib/ai-parser";
+import { fetchFundFromWebApi, postTransactionToWebApi } from "../lib/web-api";
 
 /**
  * Group and fund context resolved from the Telegram chat ID.
@@ -427,6 +428,27 @@ async function handleHelp(chatId: number, env: Env) {
 
 async function handleBalance(chatId: number, context: GroupFundContext, env: Env) {
   try {
+    if (env.WEB_API_URL) {
+      const syncData = await fetchFundFromWebApi(env);
+      if (syncData?.fund) {
+        const f = syncData.fund;
+        await sendMessage(
+          chatId,
+          `💰 Fund Balance (${f.name})\n\n` +
+            `Type: ${f.fundType === "BATCH" ? "Batch Fund" : "Room Fund"}\n` +
+            `Current Balance: ${formatTaka(f.totalBalancePaisa)}\n` +
+            `Total Contributions: ${formatTaka(f.totalContributionsPaisa)}\n` +
+            `Total Expenses: ${formatTaka(f.totalExpensesPaisa)}\n` +
+            `Active Members: ${f.memberCount}\n` +
+            (f.targetBudgetPaisa > 0 ? `Target Goal: ${formatTaka(f.targetBudgetPaisa)}\n` : "") +
+            (f.announcement ? `Notice: ${f.announcement}\n` : ""),
+          env,
+          { reply_markup: getDashboardMarkup(env) }
+        );
+        return;
+      }
+    }
+
     const fund = await env.DB.prepare(
       `SELECT opening_balance_paisa FROM funds WHERE id = ?`
     )
@@ -708,6 +730,20 @@ async function handleContribution(
       ),
     ]);
 
+    if (env.WEB_API_URL) {
+      await postTransactionToWebApi(
+        {
+          type: "CONTRIBUTION",
+          memberName: member.displayName,
+          amountPaisa,
+          description,
+          telegramChatId: chatId,
+          telegramUser: msg.from?.username || msg.from?.first_name || "Telegram User",
+        },
+        env
+      );
+    }
+
     await sendMessage(
       chatId,
       `✅ Contribution Recorded\n\n` +
@@ -796,6 +832,20 @@ async function handleExpense(
         now
       ),
     ]);
+
+    if (env.WEB_API_URL) {
+      await postTransactionToWebApi(
+        {
+          type: "EXPENSE",
+          category,
+          amountPaisa,
+          description,
+          telegramChatId: chatId,
+          telegramUser: msg.from?.username || msg.from?.first_name || "Telegram User",
+        },
+        env
+      );
+    }
 
     await sendMessage(
       chatId,

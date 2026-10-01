@@ -3,27 +3,18 @@
 import React, { useState, useEffect } from "react";
 import Decimal from "decimal.js";
 import {
-  TrendingUp,
-  TrendingDown,
-  Plus,
-  Minus,
-  Users,
   Activity,
   ArrowUpRight,
   ArrowDownRight,
   MessageCircle,
-  Wallet,
   RotateCcw,
-  Filter,
   Download,
-  ShieldCheck,
-  CheckCircle2,
-  XCircle,
-  Clock,
+  Eye,
+  Target,
+  Sparkles,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useTelegramWebApp } from "@/lib/telegram/useTelegramWebApp";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -33,8 +24,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
+// Types
 type TransactionType = "CONTRIBUTION" | "EXPENSE" | "REFUND" | "CORRECTION" | "REVERSAL";
 
 interface Member {
@@ -43,6 +33,7 @@ interface Member {
   role: "OWNER" | "TREASURER" | "MEMBER" | "VIEWER";
   totalContributedPaisa: number;
   status: "active" | "suspended";
+  telegramUsername?: string;
 }
 
 interface Transaction {
@@ -51,15 +42,29 @@ interface Transaction {
   memberName?: string;
   description: string;
   category?: string;
-  amountPaisa: number; // positive = credit, negative = debit
+  amountPaisa: number;
   source: "TELEGRAM" | "WEB";
   date: string;
   createdBy: string;
   status: "completed" | "pending" | "reversed";
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+interface FundInfo {
+  id: string;
+  name: string;
+  fundType: "ROOM" | "BATCH";
+  currency: string;
+  openingBalancePaisa: number;
+  totalBalancePaisa: number;
+  totalContributionsPaisa: number;
+  totalExpensesPaisa: number;
+  memberCount: number;
+  targetBudgetPaisa: number;
+  description: string;
+  announcement: string;
+}
 
+// Helpers
 function paisa(taka: number): number {
   return Math.round(taka * 100);
 }
@@ -73,16 +78,28 @@ function formatTaka(amountPaisa: number): string {
   return `৳${formatted}`;
 }
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
-
-const OPENING_BALANCE_PAISA = paisa(1000);
+// Fallback seed data
+const initialFund: FundInfo = {
+  id: "fund-main",
+  name: "Room 302 General Fund",
+  fundType: "ROOM",
+  currency: "BDT",
+  openingBalancePaisa: paisa(1000),
+  totalBalancePaisa: paisa(3670),
+  totalContributionsPaisa: paisa(6300),
+  totalExpensesPaisa: paisa(3630),
+  memberCount: 5,
+  targetBudgetPaisa: paisa(10000),
+  description: "Shared living and mess expenses for Room 302 members",
+  announcement: "Monthly contributions due on the 5th of each month",
+};
 
 const seedMembers: Member[] = [
-  { id: "m-1", name: "Adnan Shahria", role: "TREASURER", totalContributedPaisa: paisa(2000), status: "active" },
-  { id: "m-2", name: "Murad Hasan", role: "MEMBER", totalContributedPaisa: paisa(1500), status: "active" },
-  { id: "m-3", name: "Rahim Uddin", role: "MEMBER", totalContributedPaisa: paisa(1200), status: "active" },
-  { id: "m-4", name: "Karim Sheikh", role: "MEMBER", totalContributedPaisa: paisa(900), status: "active" },
-  { id: "m-5", name: "Farhan Ali", role: "MEMBER", totalContributedPaisa: paisa(600), status: "suspended" },
+  { id: "m-1", name: "Adnan Shahria", role: "TREASURER", totalContributedPaisa: paisa(2000), status: "active", telegramUsername: "adnan_dev" },
+  { id: "m-2", name: "Murad Hasan", role: "MEMBER", totalContributedPaisa: paisa(1500), status: "active", telegramUsername: "murad_h" },
+  { id: "m-3", name: "Rahim Uddin", role: "MEMBER", totalContributedPaisa: paisa(1200), status: "active", telegramUsername: "rahim_u" },
+  { id: "m-4", name: "Karim Sheikh", role: "MEMBER", totalContributedPaisa: paisa(900), status: "active", telegramUsername: "karim_s" },
+  { id: "m-5", name: "Farhan Ali", role: "MEMBER", totalContributedPaisa: paisa(600), status: "suspended", telegramUsername: "farhan_a" },
 ];
 
 const seedTransactions: Transaction[] = [
@@ -111,11 +128,11 @@ const seedTransactions: Transaction[] = [
   {
     id: "tx-3",
     type: "EXPENSE",
-    description: "Grocery — vegetables and rice",
+    description: "Weekly groceries from bazaar",
     category: "GROCERY",
     amountPaisa: -paisa(150),
     source: "TELEGRAM",
-    date: "2026-10-01",
+    date: "2026-09-30",
     createdBy: "Adnan Shahria",
     status: "completed",
   },
@@ -133,7 +150,7 @@ const seedTransactions: Transaction[] = [
   {
     id: "tx-5",
     type: "EXPENSE",
-    description: "Electricity bill — September",
+    description: "Electricity bill share",
     category: "ELECTRICITY",
     amountPaisa: -paisa(400),
     source: "TELEGRAM",
@@ -167,7 +184,7 @@ const seedTransactions: Transaction[] = [
     id: "tx-8",
     type: "REFUND",
     memberName: "Farhan Ali",
-    description: "Refund — overpaid last month",
+    description: "Refund for overpayment",
     amountPaisa: paisa(100),
     source: "WEB",
     date: "2026-09-20",
@@ -175,8 +192,6 @@ const seedTransactions: Transaction[] = [
     status: "completed",
   },
 ];
-
-// ─── Small components ─────────────────────────────────────────────────────────
 
 function RoleBadge({ role }: { role: Member["role"] }) {
   const map: Record<Member["role"], { label: string; className: string }> = {
@@ -199,9 +214,7 @@ function RoleBadge({ role }: { role: Member["role"] }) {
   };
   const { label, className } = map[role];
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${className}`}
-    >
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${className}`}>
       {label}
     </span>
   );
@@ -226,7 +239,7 @@ function TxTypeBadge({ type }: { type: TransactionType }) {
     },
     CORRECTION: {
       label: "Correction",
-      className: "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+      className: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
       icon: <Activity className="h-3 w-3" />,
     },
     REVERSAL: {
@@ -237,74 +250,66 @@ function TxTypeBadge({ type }: { type: TransactionType }) {
   };
   const { label, className, icon } = map[type];
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${className}`}
-    >
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>
       {icon}
       {label}
     </span>
   );
 }
 
-function StatusDot({ status }: { status: Transaction["status"] }) {
-  if (status === "completed")
-    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
-  if (status === "reversed")
-    return <XCircle className="h-3.5 w-3.5 text-slate-400" />;
-  return <Clock className="h-3.5 w-3.5 text-amber-400" />;
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
-
 export default function DashboardPage() {
-  const { isInsideTelegram, user: tgUser, triggerHaptic } = useTelegramWebApp();
-  const [transactions, setTransactions] = useState<Transaction[]>(seedTransactions);
+  const { user: tgUser, isInsideTelegram } = useTelegramWebApp();
+
+  const [fund, setFund] = useState<FundInfo>(initialFund);
   const [members, setMembers] = useState<Member[]>(seedMembers);
+  const [transactions, setTransactions] = useState<Transaction[]>(seedTransactions);
   const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "members">("overview");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"contribution" | "expense">("contribution");
+  const [txFilter, setTxFilter] = useState<string>("ALL");
 
-  // Form state
-  const [formMember, setFormMember] = useState(seedMembers[0].name);
-  const [formAmountTaka, setFormAmountTaka] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [formCategory, setFormCategory] = useState("GROCERY");
-
-  // Load live data from API routes on mount
   useEffect(() => {
     async function loadData() {
       try {
-        const [txRes, memRes] = await Promise.all([
-          fetch("/api/transactions"),
+        const [fundRes, membersRes, txRes] = await Promise.all([
+          fetch("/api/fund"),
           fetch("/api/members"),
+          fetch("/api/transactions"),
         ]);
 
-        if (txRes.ok) {
-          const txData = (await txRes.json()) as { ok: boolean; transactions?: Transaction[] };
-          if (txData.transactions && Array.isArray(txData.transactions)) {
-            setTransactions(txData.transactions);
-          }
+        if (fundRes.ok) {
+          const fundData = (await fundRes.json()) as { ok?: boolean; fund?: FundInfo };
+          if (fundData.ok && fundData.fund) setFund(fundData.fund);
         }
 
-        if (memRes.ok) {
-          interface ApiMember {
-            id: string;
-            displayName: string;
-            role: "OWNER" | "TREASURER" | "MEMBER" | "VIEWER";
-            contributedPaisa: number;
-            status: "active" | "suspended";
-          }
-          const memData = (await memRes.json()) as { ok: boolean; members?: ApiMember[] };
-          if (memData.members && Array.isArray(memData.members)) {
+        if (membersRes.ok) {
+          const membersData = (await membersRes.json()) as {
+            ok?: boolean;
+            members?: Array<{
+              id: string;
+              displayName: string;
+              role: Member["role"];
+              contributedPaisa: number;
+              status: Member["status"];
+              telegramUsername?: string;
+            }>;
+          };
+          if (membersData.ok && Array.isArray(membersData.members)) {
             setMembers(
-              memData.members.map((m: ApiMember) => ({
+              membersData.members.map((m) => ({
                 id: m.id,
                 name: m.displayName,
                 role: m.role,
                 totalContributedPaisa: m.contributedPaisa,
                 status: m.status,
+                telegramUsername: m.telegramUsername,
               }))
             );
+          }
+        }
+
+        if (txRes.ok) {
+          const txData = (await txRes.json()) as { ok?: boolean; transactions?: Transaction[] };
+          if (txData.ok && Array.isArray(txData.transactions)) {
+            setTransactions(txData.transactions);
           }
         }
       } catch (err) {
@@ -314,8 +319,7 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  // ── Derived ledger ─────────────────────────────────────────────────────────
-
+  // Ledger totals
   const totalContributionsPaisa = transactions
     .filter((t) => t.type === "CONTRIBUTION" && t.status !== "reversed")
     .reduce((acc, t) => acc + t.amountPaisa, 0);
@@ -326,70 +330,15 @@ export default function DashboardPage() {
 
   const totalExpensesPaisa = transactions
     .filter((t) => (t.type === "EXPENSE" || t.type === "REVERSAL") && t.status !== "reversed")
-    .reduce((acc, t) => acc + t.amountPaisa, 0); // amountPaisa is negative for expenses
+    .reduce((acc, t) => acc + t.amountPaisa, 0);
 
   const currentBalancePaisa =
-    OPENING_BALANCE_PAISA +
+    fund.openingBalancePaisa +
     totalContributionsPaisa +
     totalRefundsPaisa +
     totalExpensesPaisa;
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-
-  function openModal(mode: "contribution" | "expense") {
-    setModalMode(mode);
-    setFormAmountTaka("");
-    setFormDescription("");
-    setFormMember(members[0]?.name || "Adnan Shahria");
-    setFormCategory("GROCERY");
-    setIsModalOpen(true);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const amountTaka = parseFloat(formAmountTaka);
-    if (isNaN(amountTaka) || amountTaka <= 0) return;
-
-    const amountP = paisa(amountTaka);
-    const newTx: Transaction = {
-      id: `tx-${Date.now()}`,
-      type: modalMode === "contribution" ? "CONTRIBUTION" : "EXPENSE",
-      memberName: modalMode === "contribution" ? formMember : undefined,
-      description: formDescription || (modalMode === "contribution" ? "Manual contribution" : "Manual expense"),
-      category: modalMode === "expense" ? formCategory : undefined,
-      amountPaisa: modalMode === "contribution" ? amountP : -amountP,
-      source: "WEB",
-      date: new Date().toISOString().split("T")[0],
-      createdBy: "Adnan Shahria",
-      status: "completed",
-    };
-
-    // Optimistically update client state
-    setTransactions((prev) => [newTx, ...prev]);
-    setIsModalOpen(false);
-    triggerHaptic("medium");
-
-    // Persist to backend API
-    try {
-      await fetch("/api/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: newTx.type,
-          memberName: newTx.memberName,
-          category: newTx.category,
-          amountPaisa: Math.abs(newTx.amountPaisa),
-          description: newTx.description,
-          createdBy: newTx.createdBy,
-        }),
-      });
-    } catch (err) {
-      console.error("Failed to persist transaction to API:", err);
-    }
-  }
-
-  // ── Expense breakdown ──────────────────────────────────────────────────────
-
+  // Expense breakdown
   const expenseCategories: Record<string, number> = {};
   transactions
     .filter((t) => t.type === "EXPENSE" && t.status !== "reversed")
@@ -398,12 +347,22 @@ export default function DashboardPage() {
       expenseCategories[cat] = (expenseCategories[cat] ?? 0) + Math.abs(t.amountPaisa);
     });
 
+  const filteredTransactions = transactions.filter((t) => {
+    if (txFilter === "ALL") return true;
+    return t.type === txFilter;
+  });
+
+  const progressPercent = fund.targetBudgetPaisa > 0
+    ? Math.min(100, Math.round((currentBalancePaisa / fund.targetBudgetPaisa) * 100))
+    : 0;
+
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-6 py-8 space-y-8">
-        {/* ── Telegram Mini App banner ── */}
+
+        {/* Telegram Mini App indicator */}
         {isInsideTelegram && (
           <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-medium">
             <div className="flex items-center gap-2">
@@ -418,62 +377,68 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Hero banner ── */}
+        {/* User side read only notice */}
+        <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white/70 dark:bg-slate-900/50 dark:border-slate-800 px-4 py-3 text-sm text-slate-600 dark:text-slate-400 shadow-sm">
+          <Eye className="h-5 w-5 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div className="space-y-1">
+            <p className="font-medium text-slate-800 dark:text-slate-200">
+              Public Ledger View (Read Only)
+            </p>
+            <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              This dashboard provides complete financial transparency for all fund members.
+              To record contributions or report expenses, talk directly to the Telegram bot in your group chat using commands like{" "}
+              <code className="font-mono font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">/add Murad 200</code> or{" "}
+              <code className="font-mono font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">/expense 90 grocery</code>.
+            </p>
+          </div>
+        </div>
+
+        {/* Hero banner */}
         <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950/70 p-8 text-white shadow-xl ring-1 ring-white/10">
           <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl" />
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-2 max-w-2xl">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="uppercase tracking-widest text-[11px] py-1 font-semibold bg-emerald-950/60 text-emerald-300 border-emerald-700/40">
-                  FVMAS-16 · Room 302 Fund
+            <div className="space-y-3 max-w-2xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="uppercase tracking-widest text-[11px] py-1 font-semibold bg-emerald-950/70 text-emerald-300 border-emerald-700/50">
+                  {fund.fundType === "BATCH" ? "Batch Fund" : "Room Fund"}
                 </Badge>
                 <span className="text-xs text-emerald-300/80 font-mono">
-                  Cloudflare D1 · Telegram Bot Active
+                  Cloudflare Ledger · Zero Discrepancy
                 </span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-                Room Fund Dashboard
+                {fund.name}
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Centralized ledger for your room. Record contributions and expenses through
-                Telegram or here. Balance is calculated from every transaction.
+                {fund.description}
               </p>
+              {fund.announcement && (
+                <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs text-emerald-300">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Notice: {fund.announcement}</span>
+                </div>
+              )}
             </div>
 
+            {/* Export CSV action */}
             <div className="flex flex-wrap items-center gap-3">
-              <Button
-                id="btn-add-contribution"
-                className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg"
-                onClick={() => openModal("contribution")}
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Contribution</span>
-              </Button>
-              <Button
-                id="btn-add-expense"
-                variant="outline"
-                className="border-slate-700 bg-slate-900/80 text-white hover:bg-slate-800 hover:text-red-300 gap-2"
-                onClick={() => openModal("expense")}
-              >
-                <Minus className="h-4 w-4" />
-                <span>Record Expense</span>
-              </Button>
-              <Button
-                id="btn-export"
-                variant="outline"
-                className="border-slate-700 bg-slate-900/80 text-white hover:bg-slate-800 hover:text-emerald-300 gap-2"
+              <a
+                id="btn-export-hero"
+                href="/api/export"
+                download
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm font-medium hover:bg-slate-700 transition shadow"
               >
                 <Download className="h-4 w-4" />
-                <span>Export</span>
-              </Button>
+                Export CSV Ledger
+              </a>
             </div>
           </div>
 
-          {/* Stats row */}
+          {/* Stats overview */}
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-slate-800/80 pt-6">
             <div className="space-y-1">
               <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                Current Balance
+                Current Net Balance
               </p>
               <div className="flex items-baseline gap-2">
                 <span className={`text-3xl font-bold tabular-nums ${currentBalancePaisa >= 0 ? "text-emerald-400" : "text-red-400"}`}>
@@ -484,597 +449,369 @@ export default function DashboardPage() {
 
             <div className="space-y-1">
               <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                Total Contributions
+                Total Collected
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold tabular-nums text-white">
-                  {formatTaka(totalContributionsPaisa + totalRefundsPaisa)}
-                </span>
-                <span className="text-xs font-semibold text-emerald-400 flex items-center">
-                  <TrendingUp className="h-3 w-3 mr-0.5" />
-                  Inflows
-                </span>
-              </div>
+              <p className="text-2xl font-bold tabular-nums text-slate-200">
+                {formatTaka(totalContributionsPaisa)}
+              </p>
             </div>
 
             <div className="space-y-1">
               <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                Total Expenses
+                Total Spent
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold tabular-nums text-red-300">
-                  {formatTaka(Math.abs(totalExpensesPaisa))}
-                </span>
-                <span className="text-xs font-semibold text-red-400 flex items-center">
-                  <TrendingDown className="h-3 w-3 mr-0.5" />
-                  Outflows
-                </span>
-              </div>
+              <p className="text-2xl font-bold tabular-nums text-red-400">
+                {formatTaka(Math.abs(totalExpensesPaisa))}
+              </p>
             </div>
 
             <div className="space-y-1">
               <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
                 Active Members
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold tabular-nums text-white">
-                  {members.filter((m) => m.status === "active").length}
-                </span>
-                <span className="text-xs text-slate-400">of {members.length}</span>
-              </div>
+              <p className="text-2xl font-bold tabular-nums text-slate-200">
+                {members.filter((m) => m.status === "active").length}
+              </p>
             </div>
           </div>
+
+          {/* Target budget progress */}
+          {fund.targetBudgetPaisa > 0 && (
+            <div className="mt-6 pt-4 border-t border-slate-800/60 space-y-2">
+              <div className="flex justify-between text-xs text-slate-300">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Target className="h-3.5 w-3.5 text-emerald-400" />
+                  Target Budget Goal: {formatTaka(fund.targetBudgetPaisa)}
+                </span>
+                <span className="font-mono text-emerald-300">
+                  {progressPercent}% Achieved
+                </span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+                />
+              </div>
+            </div>
+          )}
         </section>
 
-        {/* ── Telegram reminder ── */}
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-          <MessageCircle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>
-            You can also record transactions directly in Telegram. Try{" "}
-            <code className="font-mono font-bold">/add Murad 200</code> or{" "}
-            <code className="font-mono font-bold">/expense 90 grocery</code> in your group chat.
-          </span>
-        </div>
-
-        {/* ── Tab nav ── */}
+        {/* Navigation tabs */}
         <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-          <Button
-            id="tab-overview"
-            variant={activeTab === "overview" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => {
-              triggerHaptic("light");
-              setActiveTab("overview");
-            }}
-            className="gap-2"
+          <button
+            onClick={() => setActiveTab("overview")}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${
+              activeTab === "overview"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}
           >
-            <Wallet className="h-4 w-4" />
-            <span>Overview</span>
-          </Button>
-
-          <Button
-            id="tab-transactions"
-            variant={activeTab === "transactions" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => {
-              triggerHaptic("light");
-              setActiveTab("transactions");
-            }}
-            className="gap-2"
+            Overview & Breakdown
+          </button>
+          <button
+            onClick={() => setActiveTab("transactions")}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${
+              activeTab === "transactions"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}
           >
-            <Activity className="h-4 w-4" />
-            <span>Transactions</span>
-            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
-              {transactions.length}
-            </Badge>
-          </Button>
-
-          <Button
-            id="tab-members"
-            variant={activeTab === "members" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => {
-              triggerHaptic("light");
-              setActiveTab("members");
-            }}
-            className="gap-2"
+            Transaction History ({transactions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("members")}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${
+              activeTab === "members"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}
           >
-            <Users className="h-4 w-4" />
-            <span>Members</span>
-            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
-              {members.length}
-            </Badge>
-          </Button>
+            Member Directory ({members.length})
+          </button>
         </div>
 
-        {/* ── Overview tab ── */}
+        {/* Tab 1: Overview */}
         {activeTab === "overview" && (
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Ledger summary */}
-            <Card className="col-span-2">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Wallet className="h-5 w-5 text-emerald-600" />
-                  <CardTitle>Ledger Summary</CardTitle>
-                </div>
-                <CardDescription>
-                  Balance is computed from every transaction. The opening balance was{" "}
-                  {formatTaka(OPENING_BALANCE_PAISA)}.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="rounded-lg bg-slate-900 p-4 font-mono text-sm text-emerald-300 space-y-2">
-                  <p className="text-slate-400 text-xs"># Ledger Calculation</p>
-                  <p>Opening Balance         {formatTaka(OPENING_BALANCE_PAISA)}</p>
-                  <p>Total Contributions   + {formatTaka(totalContributionsPaisa)}</p>
-                  {totalRefundsPaisa > 0 && (
-                    <p>Refunds              + {formatTaka(totalRefundsPaisa)}</p>
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              {/* Expense category breakdown */}
+              <Card className="lg:col-span-1 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base font-bold">
+                    Spending by Category
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Distribution of all verified expenditures
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {Object.keys(expenseCategories).length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">
+                      No expenses recorded yet.
+                    </p>
+                  ) : (
+                    Object.entries(expenseCategories).map(([cat, paisaVal]) => {
+                      const totalExp = Math.abs(totalExpensesPaisa) || 1;
+                      const percent = Math.round((paisaVal / totalExp) * 100);
+                      return (
+                        <div key={cat} className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                              {cat}
+                            </span>
+                            <span className="font-mono text-slate-600 dark:text-slate-400">
+                              {formatTaka(paisaVal)} ({percent}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-red-500 h-1.5 rounded-full"
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
-                  <p>Total Expenses        - {formatTaka(Math.abs(totalExpensesPaisa))}</p>
-                  <p className="border-t border-slate-700 pt-2 text-white font-semibold">
-                    Current Balance        = {formatTaka(currentBalancePaisa)}
-                  </p>
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-                    <p className="text-xs text-muted-foreground">Data Source</p>
-                    <p className="mt-1 font-semibold text-sm text-emerald-600">
-                      Cloudflare D1 (authoritative)
-                    </p>
+              {/* Recent activity summary */}
+              <Card className="lg:col-span-2 shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <div>
+                    <CardTitle className="text-base font-bold">
+                      Latest Activity
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Recent transactions recorded via Telegram or administrative audit
+                    </CardDescription>
                   </div>
-                  <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-                    <p className="text-xs text-muted-foreground">Primary Interface</p>
-                    <p className="mt-1 font-semibold text-sm text-blue-600 dark:text-blue-400">
-                      Telegram Bot
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Expense breakdown */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-slate-500" />
-                  <CardTitle>Expense Breakdown</CardTitle>
-                </div>
-                <CardDescription>By category</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {Object.entries(expenseCategories).length === 0 && (
-                  <p className="text-xs text-muted-foreground">No expenses recorded yet.</p>
-                )}
-                {Object.entries(expenseCategories).map(([cat, amtPaisa]) => (
-                  <div
-                    key={cat}
-                    className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 last:border-0"
+                  <button
+                    onClick={() => setActiveTab("transactions")}
+                    className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
                   >
-                    <span className="text-muted-foreground capitalize">{cat.toLowerCase()}</span>
-                    <span className="font-semibold tabular-nums text-red-600 dark:text-red-400">
-                      {formatTaka(amtPaisa)}
-                    </span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Member contributions */}
-            <Card className="col-span-full">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-slate-500" />
-                  <CardTitle>Member Contributions</CardTitle>
-                </div>
-                <CardDescription>Total contributed per member</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {[...members]
-                    .sort((a, b) => b.totalContributedPaisa - a.totalContributedPaisa)
-                    .map((m) => (
-                      <div
-                        key={m.id}
-                        className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
-                      >
+                    View All →
+                  </button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {transactions.slice(0, 6).map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200">
-                            {m.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .slice(0, 2)}
-                          </div>
+                          <TxTypeBadge type={tx.type} />
                           <div>
-                            <p className="text-sm font-semibold">{m.name}</p>
-                            <RoleBadge role={m.role} />
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              {tx.description}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {tx.memberName || tx.category || "General"} · {tx.date} · via {tx.source}
+                            </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                            {formatTaka(m.totalContributedPaisa)}
-                          </p>
-                          {m.status === "suspended" && (
-                            <p className="text-[10px] text-red-500">Suspended</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-        )}
-
-        {/* ── Transactions tab ── */}
-        {activeTab === "transactions" && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold tracking-tight">Transaction Ledger</h2>
-                <p className="text-xs text-muted-foreground">
-                  Immutable financial record. Corrections use reversals, not deletions.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <a
-                  id="btn-export-csv"
-                  href="/api/export"
-                  download
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-sm"
-                >
-                  <Download className="h-3.5 w-3.5 text-slate-500" />
-                  Export CSV
-                </a>
-                <Button id="btn-filter" variant="outline" size="sm" className="gap-1.5 text-xs">
-                  <Filter className="h-3.5 w-3.5" />
-                  Filter
-                </Button>
-                <Button
-                  id="btn-add-tx"
-                  size="sm"
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs"
-                  onClick={() => openModal("contribution")}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add
-                </Button>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Date
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Type
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Description
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Source
-                    </th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Amount
-                    </th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr
-                      key={tx.id}
-                      className="border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors last:border-0"
-                    >
-                      <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
-                        {tx.date}
-                      </td>
-                      <td className="px-4 py-3">
-                        <TxTypeBadge type={tx.type} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900 dark:text-slate-100">
-                          {tx.memberName ? tx.memberName : tx.description}
-                        </p>
-                        {tx.memberName && (
-                          <p className="text-xs text-muted-foreground">{tx.description}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          {tx.source === "TELEGRAM" ? (
-                            <MessageCircle className="h-3 w-3 text-blue-500" />
-                          ) : (
-                            <Activity className="h-3 w-3 text-slate-400" />
-                          )}
-                          {tx.source === "TELEGRAM" ? "Telegram" : "Web"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums">
                         <span
-                          className={
-                            tx.amountPaisa >= 0
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-red-600 dark:text-red-400"
-                          }
+                          className={`font-mono text-sm font-bold tabular-nums ${
+                            tx.amountPaisa > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+                          }`}
                         >
-                          {tx.amountPaisa >= 0 ? "+" : ""}
+                          {tx.amountPaisa > 0 ? "+" : ""}
                           {formatTaka(tx.amountPaisa)}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex justify-center">
-                          <StatusDot status={tx.status} />
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </section>
+
+            {/* Member contribution leaders */}
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-bold">
+                  Member Contribution Standings
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Summary of member share and participation
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {members.map((m) => (
+                    <div
+                      key={m.id}
+                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                            {m.name}
+                          </p>
+                          {m.telegramUsername && (
+                            <p className="text-xs text-sky-500 font-mono">
+                              @{m.telegramUsername}
+                            </p>
+                          )}
+                        </div>
+                        <RoleBadge role={m.role} />
+                      </div>
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-baseline">
+                        <span className="text-xs text-muted-foreground">Contributed</span>
+                        <span className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                          {formatTaka(m.totalContributedPaisa)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
-        {/* ── Members tab ── */}
-        {activeTab === "members" && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
+        {/* Tab 2: Transactions */}
+        {activeTab === "transactions" && (
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold tracking-tight">Members</h2>
-                <p className="text-xs text-muted-foreground">
-                  Roles determine what each member can do in Telegram and the dashboard.
-                </p>
+                <CardTitle className="text-base font-bold">
+                  Immutable Transaction History
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Every entry is cryptographically verifiable and logged with timestamp and author
+                </CardDescription>
               </div>
-              <Button
-                id="btn-add-member"
-                size="sm"
-                className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add Member
-              </Button>
+
+              {/* Filter */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {["ALL", "CONTRIBUTION", "EXPENSE", "REFUND", "REVERSAL"].map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setTxFilter(filter)}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${
+                      txFilter === filter
+                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                        : "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200"
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 dark:bg-slate-900/60 text-xs uppercase font-semibold text-slate-500 border-y border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="px-6 py-3">Type</th>
+                      <th className="px-6 py-3">Party or Category</th>
+                      <th className="px-6 py-3">Description</th>
+                      <th className="px-6 py-3">Date</th>
+                      <th className="px-6 py-3">Recorded By</th>
+                      <th className="px-6 py-3 text-right">Amount (BDT)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredTransactions.map((tx) => (
+                      <tr
+                        key={tx.id}
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-900/40 transition ${
+                          tx.status === "reversed" ? "opacity-50 line-through" : ""
+                        }`}
+                      >
+                        <td className="px-6 py-3.5">
+                          <TxTypeBadge type={tx.type} />
+                        </td>
+                        <td className="px-6 py-3.5 font-medium text-slate-800 dark:text-slate-200">
+                          {tx.memberName || tx.category || "General"}
+                        </td>
+                        <td className="px-6 py-3.5 text-slate-600 dark:text-slate-400">
+                          {tx.description}
+                        </td>
+                        <td className="px-6 py-3.5 text-slate-500 font-mono text-xs">
+                          {tx.date}
+                        </td>
+                        <td className="px-6 py-3.5 text-xs text-slate-500">
+                          {tx.createdBy}
+                        </td>
+                        <td
+                          className={`px-6 py-3.5 text-right font-mono font-bold tabular-nums ${
+                            tx.amountPaisa > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+                          }`}
+                        >
+                          {tx.amountPaisa > 0 ? "+" : ""}
+                          {formatTaka(tx.amountPaisa)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tab 3: Members */}
+        {activeTab === "members" && (
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                Registered Members
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                All members in this fund with assigned roles and total contributions
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {members.map((m) => (
-                <Card key={m.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-5">
+                <Card key={m.id} className="shadow-sm">
+                  <CardContent className="p-5 space-y-4">
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">
-                          {m.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm">{m.name}</p>
-                          <RoleBadge role={m.role} />
-                        </div>
+                      <div className="space-y-1">
+                        <p className="font-bold text-slate-900 dark:text-slate-100">
+                          {m.name}
+                        </p>
+                        {m.telegramUsername ? (
+                          <p className="text-xs text-sky-500 font-mono">
+                            @{m.telegramUsername}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground font-mono">
+                            ID: {m.id}
+                          </p>
+                        )}
                       </div>
-                      {m.status === "suspended" && (
-                        <span className="text-[10px] font-semibold text-red-500 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded-full">
-                          Suspended
-                        </span>
-                      )}
+                      <RoleBadge role={m.role} />
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-baseline">
                       <div>
-                        <p className="text-xs text-muted-foreground">Total contributed</p>
+                        <p className="text-xs text-muted-foreground">Total Contributed</p>
                         <p className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
                           {formatTaka(m.totalContributedPaisa)}
                         </p>
                       </div>
-                      <Button
-                        id={`btn-member-actions-${m.id}`}
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs"
+                      <Badge
+                        variant="outline"
+                        className={
+                          m.status === "active"
+                            ? "text-emerald-600 border-emerald-300"
+                            : "text-amber-600 border-amber-300"
+                        }
                       >
-                        Actions
-                      </Button>
+                        {m.status}
+                      </Badge>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
-
-            {/* Permission matrix */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Permission Matrix</CardTitle>
-                <CardDescription>What each role can do</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800">
-                        <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Action</th>
-                        <th className="text-center py-2 px-3 font-medium">Owner</th>
-                        <th className="text-center py-2 px-3 font-medium">Treasurer</th>
-                        <th className="text-center py-2 px-3 font-medium">Member</th>
-                        <th className="text-center py-2 px-3 font-medium">Viewer</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
-                      {[
-                        { action: "View balance", owner: true, treasurer: true, member: true, viewer: true },
-                        { action: "View transactions", owner: true, treasurer: true, member: true, viewer: true },
-                        { action: "Add contribution", owner: true, treasurer: true, member: false, viewer: false },
-                        { action: "Add expense", owner: true, treasurer: true, member: false, viewer: false },
-                        { action: "Reverse transaction", owner: true, treasurer: true, member: false, viewer: false },
-                        { action: "Add member", owner: true, treasurer: true, member: false, viewer: false },
-                        { action: "Assign Treasurer", owner: true, treasurer: false, member: false, viewer: false },
-                        { action: "View audit log", owner: true, treasurer: true, member: false, viewer: false },
-                        { action: "Export records", owner: true, treasurer: true, member: false, viewer: false },
-                      ].map((row) => (
-                        <tr key={row.action}>
-                          <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">{row.action}</td>
-                          {(["owner", "treasurer", "member", "viewer"] as const).map((role) => (
-                            <td key={role} className="text-center py-2 px-3">
-                              {row[role] ? (
-                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mx-auto" />
-                              ) : (
-                                <XCircle className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 mx-auto" />
-                              )}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
           </section>
         )}
 
-        {/* ── Modal ── */}
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl ring-1 ring-slate-200 dark:ring-slate-800 space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                    {modalMode === "contribution" ? "Record Contribution" : "Record Expense"}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {modalMode === "contribution"
-                      ? "Credit the fund. Specify the member and the amount in taka."
-                      : "Debit the fund. Specify the category and the amount in taka."}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
-                  aria-label="Close modal"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4 text-sm">
-                {modalMode === "contribution" && (
-                  <div>
-                    <label
-                      htmlFor="modal-member"
-                      className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
-                    >
-                      Member
-                    </label>
-                    <select
-                      id="modal-member"
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                      value={formMember}
-                      onChange={(e) => setFormMember(e.target.value)}
-                    >
-                      {members
-                        .filter((m) => m.status === "active")
-                        .map((m) => (
-                          <option key={m.id} value={m.name}>
-                            {m.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                )}
-
-                {modalMode === "expense" && (
-                  <div>
-                    <label
-                      htmlFor="modal-category"
-                      className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
-                    >
-                      Category
-                    </label>
-                    <select
-                      id="modal-category"
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                      value={formCategory}
-                      onChange={(e) => setFormCategory(e.target.value)}
-                    >
-                      <option value="GROCERY">Grocery</option>
-                      <option value="ELECTRICITY">Electricity</option>
-                      <option value="CLEANING">Cleaning</option>
-                      <option value="INTERNET">Internet</option>
-                      <option value="TRANSPORT">Transport</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label
-                    htmlFor="modal-amount"
-                    className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
-                  >
-                    Amount (৳ Taka)
-                  </label>
-                  <input
-                    id="modal-amount"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    placeholder="e.g. 300"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"
-                    value={formAmountTaka}
-                    onChange={(e) => setFormAmountTaka(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="modal-description"
-                    className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
-                  >
-                    Description{" "}
-                    <span className="text-slate-400 font-normal">(optional)</span>
-                  </label>
-                  <input
-                    id="modal-description"
-                    type="text"
-                    placeholder={
-                      modalMode === "contribution"
-                        ? "e.g. Monthly contribution for October"
-                        : "e.g. Vegetables and rice"
-                    }
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    value={formDescription}
-                    onChange={(e) => setFormDescription(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3">
-                  <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    id="btn-modal-confirm"
-                    type="submit"
-                    className={
-                      modalMode === "contribution"
-                        ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                        : "bg-red-600 hover:bg-red-500 text-white"
-                    }
-                  >
-                    {modalMode === "contribution" ? "Record Contribution" : "Record Expense"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );
