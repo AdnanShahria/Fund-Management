@@ -97,7 +97,33 @@ export async function aiParse(text: string, env: Env): Promise<ParsedIntent | nu
       rawJsonResponse = response?.response ?? null;
     }
 
-    // 2. Try Gemini API if key is available and Workers AI was not present
+    // 2. Try NVIDIA NIM if key is available
+    if (!rawJsonResponse && env.NVIDIA_API_KEY) {
+      const model = env.NVIDIA_MODEL || "meta/llama-3.2-11b-vision-instruct";
+      const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.NVIDIA_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: trimmed },
+          ],
+          temperature: 0.1,
+          max_tokens: 256,
+        }),
+      });
+
+      if (res.ok) {
+        const data: any = await res.json();
+        rawJsonResponse = data?.choices?.[0]?.message?.content ?? null;
+      }
+    }
+
+    // 3. Try Gemini API if key is available and previous providers were absent
     if (!rawJsonResponse && env.GEMINI_API_KEY) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
       const res = await fetch(url, {

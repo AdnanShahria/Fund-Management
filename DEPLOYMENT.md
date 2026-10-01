@@ -63,6 +63,14 @@ npx wrangler secret put BOT_TOKEN
 
 When prompted, paste your bot token from @BotFather.
 
+Optional: To use NVIDIA NIM for high accuracy Bengali and natural language message parsing:
+
+```bash
+npx wrangler secret put NVIDIA_API_KEY
+```
+
+When prompted, paste your NVIDIA NIM API key.
+
 Optional: If you want to use the Gemini API fallback parser for conversational messages:
 
 ```bash

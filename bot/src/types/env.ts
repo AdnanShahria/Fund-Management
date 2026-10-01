@@ -15,6 +15,12 @@ export interface Env {
   // Optional Gemini API Key for natural language understanding
   GEMINI_API_KEY?: string;
 
+  // Optional NVIDIA NIM API Key for natural language understanding
+  NVIDIA_API_KEY?: string;
+
+  // Optional NVIDIA model override, defaults to meta/llama-3.2-11b-vision-instruct
+  NVIDIA_MODEL?: string;
+
   // Optional Dashboard URL for Telegram Mini App button
   DASHBOARD_URL?: string;
 
