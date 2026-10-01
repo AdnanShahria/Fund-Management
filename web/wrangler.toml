@@ -3,8 +3,6 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "orbit-fund-management-db"
-database_id = "local-d1-id"
-migrations_dir = "drizzle/migrations"
+# D1 binding will be added here once the database is created via:
+#   npx wrangler d1 create orbit-fund-management-db
+# Then paste the [[d1_databases]] block printed by that command.
