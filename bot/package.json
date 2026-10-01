@@ -2,10 +2,12 @@
   "name": "fund-bot",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "node --test"
   },
   "dependencies": {
     "hono": "^4.6.3",

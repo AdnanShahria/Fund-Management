@@ -15,6 +15,9 @@ export interface Env {
   // Optional Gemini API Key for natural language understanding
   GEMINI_API_KEY?: string;
 
+  // Optional Dashboard URL for Telegram Mini App button
+  DASHBOARD_URL?: string;
+
   // Environment mode
   ENVIRONMENT: string;
 }

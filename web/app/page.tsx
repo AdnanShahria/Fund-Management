@@ -22,6 +22,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
+import { useTelegramWebApp } from "@/lib/telegram/useTelegramWebApp";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -256,6 +257,7 @@ function StatusDot({ status }: { status: Transaction["status"] }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  const { isInsideTelegram, user: tgUser, triggerHaptic } = useTelegramWebApp();
   const [transactions, setTransactions] = useState<Transaction[]>(seedTransactions);
   const [members, setMembers] = useState<Member[]>(seedMembers);
   const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "members">("overview");
@@ -365,6 +367,7 @@ export default function DashboardPage() {
     // Optimistically update client state
     setTransactions((prev) => [newTx, ...prev]);
     setIsModalOpen(false);
+    triggerHaptic("medium");
 
     // Persist to backend API
     try {
@@ -400,6 +403,20 @@ export default function DashboardPage() {
       <Navbar />
 
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-6 py-8 space-y-8">
+        {/* ── Telegram Mini App banner ── */}
+        {isInsideTelegram && (
+          <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-medium">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-sky-400" />
+              <span>
+                Telegram Mini App active{tgUser ? ` (Connected as ${tgUser.first_name}${tgUser.username ? ` @${tgUser.username}` : ""})` : ""}
+              </span>
+            </div>
+            <span className="text-[10px] uppercase tracking-wider font-semibold bg-sky-500/20 px-2 py-0.5 rounded text-sky-300">
+              Synced
+            </span>
+          </div>
+        )}
 
         {/* ── Hero banner ── */}
         <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950/70 p-8 text-white shadow-xl ring-1 ring-white/10">
@@ -525,7 +542,10 @@ export default function DashboardPage() {
             id="tab-overview"
             variant={activeTab === "overview" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setActiveTab("overview")}
+            onClick={() => {
+              triggerHaptic("light");
+              setActiveTab("overview");
+            }}
             className="gap-2"
           >
             <Wallet className="h-4 w-4" />
@@ -536,7 +556,10 @@ export default function DashboardPage() {
             id="tab-transactions"
             variant={activeTab === "transactions" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setActiveTab("transactions")}
+            onClick={() => {
+              triggerHaptic("light");
+              setActiveTab("transactions");
+            }}
             className="gap-2"
           >
             <Activity className="h-4 w-4" />
@@ -550,7 +573,10 @@ export default function DashboardPage() {
             id="tab-members"
             variant={activeTab === "members" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setActiveTab("members")}
+            onClick={() => {
+              triggerHaptic("light");
+              setActiveTab("members");
+            }}
             className="gap-2"
           >
             <Users className="h-4 w-4" />

@@ -22,8 +22,8 @@
 ```
 Phase 1 (PRD Schema & Scaffolding)    [██████████] 100%
 Phase 2 (AI Parser & Web API Routes)  [██████████] 100%
-Phase 3 (Mini App & Push Reminders)   [░░░░░░░░░░] 0%
-Phase 4 (Cloudflare Production Deploy)[░░░░░░░░░░] 0%
+Phase 3 (Mini App & Cloudflare Setup) [██████████] 100%
+Phase 4 (Live Cloudflare Deploy)      [░░░░░░░░░░] 0%
 ```
 
 ---
@@ -31,7 +31,7 @@ Phase 4 (Cloudflare Production Deploy)[░░░░░░░░░░] 0%
 ## Current Session
 
 **Date:** 2026-10-01
-**Focus:** Room Fund Rebuild, Telegram Bot, AI Natural Language Fallback, and Web API Integration
+**Focus:** Room Fund Rebuild, Telegram Bot, AI Natural Language Fallback, Web API, and Telegram Mini App
 
 ### Completed Tasks
 - ✅ Replaced institutional SaaS schema with PRD Room and Group Fund model in `web/lib/db/schema/`
@@ -44,6 +44,11 @@ Phase 4 (Cloudflare Production Deploy)[░░░░░░░░░░] 0%
 - ✅ Created SQL migration `0001_room_fund_schema.sql` and `seed.sql` for D1 database
 - ✅ Built Next.js API routes in `web/app/api/` for funds, transactions, members, and CSV export
 - ✅ Connected web dashboard to live API endpoints with optimistic updates and live balance recomputation
+- ✅ Integrated Telegram WebApp SDK and built `useTelegramWebApp.ts` hook with haptics and theme adaptation
+- ✅ Added native Telegram Mini App inline button to `/start`, `/balance`, and `/summary` bot commands
+- ✅ Authored complete deployment guide in `DEPLOYMENT.md`
+- ✅ Built comprehensive unit test suite in `bot/tests/` verifying rule parser, Bengali numerals, and currency formatting (9 of 9 passing)
+- ✅ Built unit test suite in `web/tests/` verifying ledger service, member updates, and CSV export (6 of 6 passing)
 - ✅ Verified both web and bot projects compile cleanly with zero TypeScript errors
 
 ---

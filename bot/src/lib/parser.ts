@@ -76,9 +76,20 @@ function detectCategory(word: string): string {
   return EXPENSE_CATEGORIES[word.toLowerCase()] ?? "OTHER";
 }
 
-/** Parse a numeric amount string (handles "200", "200.50", "200tk", "200 tk", "200 taka") */
+const BENGALI_DIGITS: Record<string, string> = {
+  "০": "0", "১": "1", "২": "2", "৩": "3", "৪": "4",
+  "৫": "5", "৬": "6", "৭": "7", "৮": "8", "৯": "9",
+};
+
+/** Convert Bengali numerals to standard digits */
+function normalizeDigits(str: string): string {
+  return str.replace(/[০-৯]/g, (d) => BENGALI_DIGITS[d] ?? d);
+}
+
+/** Parse a numeric amount string (handles "200", "200.50", "200tk", "200 tk", "200 taka", "৪০০ টাকা") */
 function extractAmount(raw: string): number | null {
-  const cleaned = raw
+  const normalized = normalizeDigits(raw);
+  const cleaned = normalized
     .replace(/[৳,]/g, "")
     .replace(/\s*(tk|taka|টাকা)\s*/gi, "")
     .trim();
@@ -148,11 +159,23 @@ export function ruleBasedParse(text: string): ParsedIntent | null {
 
   // ── Natural language: "Murad contributed 200" / "Murad gave 300 tk" ──────
   const nlContrib = t.match(
-    /^([A-Za-z\u0980-\u09FF][\w\s.]{0,30}?)\s+(?:contributed?|gave?|paid?|দিয়েছে|দিল)\s+([\d,৳.]+(?:\s*(?:tk|taka|টাকা))?)/i
+    /^([\u0980-\u09FF\w\s.]{1,30}?)\s+(?:contributed?|gave?|paid?|দিয়েছে|দিল)\s+([\d০-৯,৳.]+(?:\s*(?:tk|taka|টাকা))?)/i
   );
   if (nlContrib) {
     const memberName = (nlContrib[1] ?? "").trim();
     const amountPaisa = extractAmount(nlContrib[2] ?? "");
+    if (memberName && amountPaisa) {
+      return { type: "CONTRIBUTION", memberName, amountPaisa, description: t };
+    }
+  }
+
+  // ── Natural language Bengali SOV: "মুরাদ ৪০০ টাকা দিল" / "মুরাদ ৫০০ টাকা দিয়েছে" ──
+  const nlContribBengali = t.match(
+    /^([\u0980-\u09FF\w\s.]{1,30}?)\s+([\d০-৯,৳.]+(?:\s*(?:tk|taka|টাকা))?)\s*(?:দিয়েছে|দিল|জমা\s*দিল|জমা)/i
+  );
+  if (nlContribBengali) {
+    const memberName = (nlContribBengali[1] ?? "").trim();
+    const amountPaisa = extractAmount(nlContribBengali[2] ?? "");
     if (memberName && amountPaisa) {
       return { type: "CONTRIBUTION", memberName, amountPaisa, description: t };
     }

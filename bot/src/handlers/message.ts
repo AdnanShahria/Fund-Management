@@ -367,6 +367,21 @@ async function resolveOrCreateMemberByName(
   return { userId, displayName: cleanName };
 }
 
+function getDashboardMarkup(env: Env) {
+  const url = env.DASHBOARD_URL;
+  if (!url) return undefined;
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "📊 Open Room Dashboard",
+          web_app: { url },
+        },
+      ],
+    ],
+  };
+}
+
 // ── Command Handlers ─────────────────────────────────────────────────────────
 
 async function handleStart(chatId: number, msg: TelegramMessage, env: Env) {
@@ -383,7 +398,8 @@ async function handleStart(chatId: number, msg: TelegramMessage, env: Env) {
       "/add <name> <amount> : record a contribution\n" +
       "/expense <amount> <category> : record an expense\n" +
       "/help : list all commands",
-    env
+    env,
+    { reply_markup: getDashboardMarkup(env) }
   );
 }
 
@@ -404,7 +420,8 @@ async function handleHelp(chatId: number, env: Env) {
       "Murad gave 300 tk\n" +
       "We spent 150 on grocery\n\n" +
       "All entries are saved directly to Cloudflare D1.",
-    env
+    env,
+    { reply_markup: getDashboardMarkup(env) }
   );
 }
 
@@ -440,7 +457,8 @@ async function handleBalance(chatId: number, context: GroupFundContext, env: Env
         `Total Contributions: ${formatTaka(contributions)}\n` +
         `Total Expenses: ${formatTaka(expenses)}\n` +
         `Opening Reserve: ${formatTaka(opening)}`,
-      env
+      env,
+      { reply_markup: getDashboardMarkup(env) }
     );
   } catch (err) {
     console.error("handleBalance error:", err);
@@ -520,7 +538,8 @@ async function handleSummary(chatId: number, context: GroupFundContext, env: Env
         `Expense Breakdown:\n${categoryLines}\n\n` +
         `Top Contributions:\n${memberLines}\n\n` +
         `Use /history to view recent individual records.`,
-      env
+      env,
+      { reply_markup: getDashboardMarkup(env) }
     );
   } catch (err) {
     console.error("handleSummary error:", err);
