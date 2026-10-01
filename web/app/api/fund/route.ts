@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getFundSummary, updateFundSettings, type FundType } from "@/lib/db/ledger-service";
 
+export const runtime = "edge";
+
 export async function GET() {
   try {
     const fund = await getFundSummary();

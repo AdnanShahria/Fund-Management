@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test"
+    "test": "node --test",
+    "pages:build": "npx @cloudflare/next-on-pages"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -23,7 +24,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261001.1",
+    "@cloudflare/next-on-pages": "^1.13.8",
+    "@cloudflare/workers-types": "^4.20240208.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

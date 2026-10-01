@@ -7,6 +7,8 @@ import {
   verifyBotApiKey,
 } from "@/lib/db/ledger-service";
 
+export const runtime = "edge";
+
 function checkBotAuth(request: Request): boolean {
   const authHeader = request.headers.get("authorization");
   const apiKeyHeader = request.headers.get("x-bot-api-key");

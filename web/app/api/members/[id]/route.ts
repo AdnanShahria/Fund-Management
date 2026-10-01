@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { updateMember, deleteMember } from "@/lib/db/ledger-service";
 
+export const runtime = "edge";
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }

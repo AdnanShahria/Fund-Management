@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { exportTransactionsCsv } from "@/lib/db/ledger-service";
 
+export const runtime = "edge";
+
 export async function GET() {
   try {
     const csvData = await exportTransactionsCsv();

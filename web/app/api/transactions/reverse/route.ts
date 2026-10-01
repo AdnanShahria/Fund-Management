@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { reverseTransaction } from "@/lib/db/ledger-service";
 
+export const runtime = "edge";
+
 export async function POST(request: Request) {
   try {
     interface ReverseRequestBody {
