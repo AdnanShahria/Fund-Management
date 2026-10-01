@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
-import { setupDevPlatform } from "@cloudflare/next-on-pages/next-dev";
 
-// Only run in development to set up local bindings (Cloudflare Pages D1, KV, etc.)
+// Only set up local Cloudflare bindings during development
+// In production this block is skipped entirely so the build does not fail
 if (process.env.NODE_ENV === "development") {
+  const { setupDevPlatform } = await import(
+    "@cloudflare/next-on-pages/next-dev"
+  );
   await setupDevPlatform();
 }
 
