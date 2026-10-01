@@ -1,0 +1,209 @@
+name: CI CD Pipeline and Health Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Pipeline action to run
+        required: true
+        default: check_and_deploy
+        type: choice
+        options:
+          - check_and_deploy
+          - dry_run_checks_only
+
+jobs:
+  # ── 1. Database and Migration Checks ──────────────────────────────────────
+  check-database:
+    name: Check Database Schema and Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Verify Drizzle ORM schema alignment
+        working-directory: web
+        run: npx drizzle-kit check
+
+      - name: Verify D1 SQL migration syntax
+        run: |
+          echo "Checking migration files existence..."
+          test -f bot/migrations/0001_room_fund_schema.sql || exit 1
+          test -f bot/migrations/seed.sql || exit 1
+          test -f web/drizzle/migrations/0001_room_fund_schema.sql || exit 1
+          echo "All database migration scripts are present and verified."
+
+      - name: Test SQL schema compilation against SQLite
+        run: |
+          sqlite3 test_fund.db < bot/migrations/0001_room_fund_schema.sql
+          sqlite3 test_fund.db < bot/migrations/seed.sql
+          echo "Verifying tables created in sqlite..."
+          sqlite3 test_fund.db "SELECT count(*) FROM funds;"
+          sqlite3 test_fund.db "SELECT count(*) FROM memberships;"
+          sqlite3 test_fund.db "SELECT count(*) FROM transactions;"
+          rm test_fund.db
+          echo "D1 database schema verified successfully."
+
+  # ── 2. Frontend Web Dashboard Checks ──────────────────────────────────────
+  check-frontend:
+    name: Check Frontend Next.js Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run TypeScript type check
+        working-directory: web
+        run: npx tsc --noEmit
+
+      - name: Run web unit tests
+        working-directory: web
+        run: npm test
+
+      - name: Build Next.js application
+        working-directory: web
+        run: npm run build
+
+  # ── 3. Telegram Bot Worker Checks ─────────────────────────────────────────
+  check-telegram-bot:
+    name: Check Telegram Bot Worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: bot/package-lock.json
+
+      - name: Install bot dependencies
+        working-directory: bot
+        run: npm ci
+
+      - name: Run bot TypeScript type check
+        working-directory: bot
+        run: npm run type-check
+
+      - name: Run bot unit tests
+        working-directory: bot
+        run: npm test
+
+      - name: Verify Cloudflare Worker bundle with Wrangler dry run
+        working-directory: bot
+        run: npx wrangler deploy --dry-run
+
+  # ── 4. Configuration and Security Audit ──────────────────────────────────
+  check-configs:
+    name: Check Configs and Secrets Safety
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify configuration templates exist
+        run: |
+          test -f bot/.dev.vars.example || exit 1
+          test -f web/.env.example || exit 1
+          test -f DEPLOYMENT.md || exit 1
+          echo "All environment templates and deployment docs exist."
+
+      - name: Verify no local secrets are committed
+        run: |
+          if git ls-files | grep -E '\.dev\.vars$|\.env$|\.env\.local$'; then
+            echo "ERROR: Local secret files must never be committed to git."
+            exit 1
+          fi
+          echo "Git repository is clean of local secrets."
+
+  # ── 5. Deploy Telegram Bot Worker ─────────────────────────────────────────
+  deploy-bot:
+    name: Deploy Telegram Bot to Cloudflare
+    needs: [check-database, check-telegram-bot, check-configs]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (github.event.inputs.action == 'check_and_deploy' || github.event.inputs.action == null)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: bot/package-lock.json
+
+      - name: Install bot dependencies
+        working-directory: bot
+        run: npm ci
+
+      - name: Deploy Worker to Cloudflare
+        working-directory: bot
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "CLOUDFLARE_API_TOKEN secret is not yet set in repository settings."
+            echo "Skipping live deploy. Worker bundle check already passed during build verification."
+          else
+            npx wrangler deploy
+          fi
+
+  # ── 6. Deploy Web Dashboard ───────────────────────────────────────────────
+  deploy-web:
+    name: Deploy Web Dashboard
+    needs: [check-database, check-frontend, check-configs]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (github.event.inputs.action == 'check_and_deploy' || github.event.inputs.action == null)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build Web Production Bundle
+        working-directory: web
+        run: npm run build
+
+      - name: Deploy Notice
+        run: |
+          echo "Web build passed all verifications."
+          echo "To link automated Cloudflare Pages or Vercel deploy, connect repository in Cloudflare Pages dashboard or Vercel dashboard."

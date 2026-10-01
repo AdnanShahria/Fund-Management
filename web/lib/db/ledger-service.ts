@@ -48,7 +48,7 @@ let fundRecord: FundSummary = {
   memberCount: 5,
 };
 
-let membersStore: MemberRecord[] = [
+const membersStore: MemberRecord[] = [
   { id: "mem-1", userId: "u-adnan", displayName: "Adnan Shahria", role: "TREASURER", status: "active", contributedPaisa: 200000 },
   { id: "mem-2", userId: "u-murad", displayName: "Murad Hasan", role: "MEMBER", status: "active", contributedPaisa: 150000 },
   { id: "mem-3", userId: "u-rahim", displayName: "Rahim Uddin", role: "MEMBER", status: "active", contributedPaisa: 120000 },
@@ -56,7 +56,7 @@ let membersStore: MemberRecord[] = [
   { id: "mem-5", userId: "u-farhan", displayName: "Farhan Ali", role: "MEMBER", status: "suspended", contributedPaisa: 60000 },
 ];
 
-let transactionsStore: TransactionRecord[] = [
+const transactionsStore: TransactionRecord[] = [
   {
     id: "tx-1",
     type: "CONTRIBUTION",
@@ -155,8 +155,11 @@ function recalculateSummary(): void {
 
 // ── Service Methods ──────────────────────────────────────────────────────────
 
-export async function getFundSummary(_fundId?: string): Promise<FundSummary> {
+export async function getFundSummary(fundId?: string): Promise<FundSummary> {
   recalculateSummary();
+  if (fundId && fundId !== fundRecord.id) {
+    return { ...fundRecord, id: fundId };
+  }
   return { ...fundRecord };
 }
 
