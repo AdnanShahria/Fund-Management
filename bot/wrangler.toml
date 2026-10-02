@@ -1,4 +1,4 @@
-name = "fund-bot"
+name = "fund-bot-fvmas-16"
 main = "src/index.ts"
 compatibility_date = "2024-10-01"
 
@@ -7,12 +7,11 @@ compatibility_date = "2024-10-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "fund-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "aa46ff75-26fc-4a0b-a3d0-9abdc08514c6"
 
 [vars]
-# Non-secret config. Secrets go in wrangler secret put BOT_TOKEN.
-ENVIRONMENT = "development"
-
-# Uncomment to bind a secret for local dev:
-# [secrets]
-# BOT_TOKEN = "..."
+ENVIRONMENT = "production"
+WEB_API_URL = "https://fvmas16.pages.dev"
+DASHBOARD_URL = "https://fvmas16.pages.dev"
+BOT_API_KEY = "orbit_bot_sync_3d81b47e2a90"
+NVIDIA_MODEL = "z-ai/glm-5.3"

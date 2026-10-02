@@ -92,14 +92,14 @@ npx wrangler deploy
 ```
 
 Wrangler gives you your worker URL, such as:
-`https://fund-bot.<your-subdomain>.workers.dev`
+`https://fund-bot-fvmas-16.<your-subdomain>.workers.dev`
 
 ## Step 5: Register the Telegram Webhook
 
 Point Telegram to your newly deployed worker webhook endpoint:
 
 ```bash
-curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://fund-bot.<your-subdomain>.workers.dev/webhook"
+curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://fund-bot-fvmas-16.<your-subdomain>.workers.dev/webhook"
 ```
 
 Telegram will respond with:
