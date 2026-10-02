@@ -112,7 +112,47 @@ test("Rule parser: /reverse command", () => {
   assert.strictEqual(res1.transactionId, "tx-12345");
 });
 
+test("Rule parser: natural language expenses with category first and amount first", () => {
+  const res1 = ruleBasedParse("bazar 450 tk");
+  assertExpense(res1);
+  assert.strictEqual(res1.category, "GROCERY");
+  assert.strictEqual(res1.amountPaisa, 45000);
+
+  const res2 = ruleBasedParse("450 tk bazar");
+  assertExpense(res2);
+  assert.strictEqual(res2.category, "GROCERY");
+  assert.strictEqual(res2.amountPaisa, 45000);
+
+  const res3 = ruleBasedParse("electricity 250");
+  assertExpense(res3);
+  assert.strictEqual(res3.category, "ELECTRICITY");
+  assert.strictEqual(res3.amountPaisa, 25000);
+});
+
+test("Rule parser: natural language inquiries and conversational chat", () => {
+  const res1 = ruleBasedParse("dashboard link?");
+  assert.ok(res1 && res1.type === "CHAT");
+  assert.match(res1.reply, /fvmas16\.pages\.dev/);
+
+  const res2 = ruleBasedParse("now");
+  assert.ok(res2 && res2.type === "CHAT");
+  assert.match(res2.reply, /I am ready/);
+
+  const res3 = ruleBasedParse("how much balance left");
+  assert.deepStrictEqual(res3, { type: "BALANCE" });
+
+  const res4 = ruleBasedParse("show summary");
+  assert.deepStrictEqual(res4, { type: "SUMMARY" });
+
+  const res5 = ruleBasedParse("recent transactions");
+  assert.deepStrictEqual(res5, { type: "HISTORY" });
+
+  const res6 = ruleBasedParse("who is in this fund members");
+  assert.deepStrictEqual(res6, { type: "MEMBERS" });
+});
+
 test("Rule parser: non financial fallback returns null", () => {
   assert.strictEqual(ruleBasedParse("hello how are you"), null);
   assert.strictEqual(ruleBasedParse("what is the weather today"), null);
 });
+

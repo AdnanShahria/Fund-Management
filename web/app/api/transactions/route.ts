@@ -26,15 +26,34 @@ export async function POST(request: Request) {
       type?: "CONTRIBUTION" | "EXPENSE";
       memberId?: string;
       memberName?: string;
+      payeeName?: string;
       category?: string;
       amountTaka?: number;
       amountPaisa?: number;
+      paymentMethod?: "CASH" | "BKASH" | "NAGAD" | "ROCKET" | "BANK_TRANSFER" | "CARD" | "OTHER";
+      referenceId?: string;
+      receiptUrl?: string;
+      feePaisa?: number;
       description?: string;
       createdBy?: string;
     }
 
     const body = (await request.json()) as TransactionRequestBody;
-    const { type, memberId, memberName, category, amountTaka, amountPaisa, description, createdBy } = body;
+    const {
+      type,
+      memberId,
+      memberName,
+      payeeName,
+      category,
+      amountTaka,
+      amountPaisa,
+      paymentMethod,
+      referenceId,
+      receiptUrl,
+      feePaisa,
+      description,
+      createdBy,
+    } = body;
 
     if (!type || (type !== "CONTRIBUTION" && type !== "EXPENSE")) {
       return NextResponse.json(
@@ -56,9 +75,14 @@ export async function POST(request: Request) {
       type,
       memberId,
       memberName,
+      payeeName,
       category,
       description: description || (type === "CONTRIBUTION" ? "Contribution via Web" : "Expense via Web"),
       amountPaisa: calculatedPaisa,
+      paymentMethod,
+      referenceId,
+      receiptUrl,
+      feePaisa,
       source: "WEB",
       createdBy: createdBy || "Treasurer",
     });

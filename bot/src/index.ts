@@ -2,13 +2,44 @@ import { Hono } from "hono";
 import type { Env } from "./types/env";
 import type { TelegramUpdate } from "./types/telegram";
 import { handleMessage } from "./handlers/message";
+import { ruleBasedParse } from "./lib/parser";
+import { aiParse } from "./lib/ai-parser";
 
 const app = new Hono<{ Bindings: Env }>();
 
 /**
- * Health check — useful to confirm the worker is alive.
+ * Health check to confirm the worker is alive.
  */
 app.get("/", (c) => c.json({ ok: true, service: "FundBot", version: "0.1.0" }));
+
+/**
+ * Diagnostic query endpoint to verify rule parser and AI parser output.
+ */
+app.get("/test-query", async (c) => {
+  const q = c.req.query("q") || "dashboard link?";
+  const rule = ruleBasedParse(q);
+  let aiError: string | null = null;
+  let rawAi: any = null;
+  let modelOutput: string | null = null;
+
+  if (c.env.AI) {
+    try {
+      rawAi = await c.env.AI.run("@cf/meta/llama-3.2-3b-instruct", {
+        messages: [
+          { role: "system", content: "You are OrbitFundBot. Reply warmly in plain text." },
+          { role: "user", content: q },
+        ],
+        max_tokens: 150,
+      });
+      modelOutput = rawAi?.response || rawAi?.choices?.[0]?.message?.content || null;
+    } catch (e: any) {
+      aiError = e?.message || String(e);
+    }
+  }
+
+  const ai = rule ? null : await aiParse(q, c.env);
+  return c.json({ q, rule, ai, hasAI: !!c.env.AI, aiError, modelOutput });
+});
 
 /**
  * Telegram webhook endpoint.

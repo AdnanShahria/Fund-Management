@@ -18,6 +18,8 @@ export interface FundSummary {
   announcement: string;
 }
 
+export type PaymentMethod = "CASH" | "BKASH" | "NAGAD" | "ROCKET" | "BANK_TRANSFER" | "CARD" | "OTHER";
+
 export interface MemberRecord {
   id: string;
   userId: string;
@@ -27,6 +29,8 @@ export interface MemberRecord {
   contributedPaisa: number;
   phone?: string;
   telegramUsername?: string;
+  targetQuotaPaisa?: number;
+  dueStatus?: "paid" | "partial" | "overdue" | "exempt";
 }
 
 export interface TransactionRecord {
@@ -41,6 +45,12 @@ export interface TransactionRecord {
   date: string;
   createdBy: string;
   status: "completed" | "pending" | "reversed";
+  paymentMethod?: PaymentMethod;
+  referenceId?: string;
+  payeeName?: string;
+  receiptUrl?: string;
+  feePaisa?: number;
+  voucherNo?: string;
 }
 
 // ─── D1 helpers ──────────────────────────────────────────────────────────────
@@ -48,8 +58,10 @@ export interface TransactionRecord {
 function getDB(): D1Database | null {
   try {
     const ctx = getRequestContext();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (ctx.env as any).DB as D1Database | null;
+    if (!ctx || !ctx.env || !(ctx.env as any).DB || typeof (ctx.env as any).DB.prepare !== "function") {
+      return null;
+    }
+    return (ctx.env as any).DB as D1Database;
   } catch {
     return null;
   }
@@ -75,18 +87,19 @@ let fallbackFund: FundSummary = {
 };
 
 let fallbackMembers: MemberRecord[] = [
-  { id: "mem-1", userId: "u-adnan", displayName: "Adnan Shahria", role: "TREASURER", status: "active", contributedPaisa: 200000, telegramUsername: "adnan_dev" },
-  { id: "mem-2", userId: "u-murad", displayName: "Murad Hasan", role: "MEMBER", status: "active", contributedPaisa: 150000, telegramUsername: "murad_h" },
-  { id: "mem-3", userId: "u-rahim", displayName: "Rahim Uddin", role: "MEMBER", status: "active", contributedPaisa: 120000, telegramUsername: "rahim_u" },
-  { id: "mem-4", userId: "u-karim", displayName: "Karim Sheikh", role: "MEMBER", status: "active", contributedPaisa: 90000, telegramUsername: "karim_s" },
-  { id: "mem-5", userId: "u-farhan", displayName: "Farhan Ali", role: "MEMBER", status: "suspended", contributedPaisa: 60000, telegramUsername: "farhan_a" },
+  { id: "mem-1", userId: "u-adnan", displayName: "Adnan Shahria", role: "TREASURER", status: "active", contributedPaisa: 200000, targetQuotaPaisa: 200000, dueStatus: "paid", telegramUsername: "adnan_dev" },
+  { id: "mem-2", userId: "u-murad", displayName: "Murad Hasan", role: "MEMBER", status: "active", contributedPaisa: 150000, targetQuotaPaisa: 200000, dueStatus: "partial", telegramUsername: "murad_h" },
+  { id: "mem-3", userId: "u-rahim", displayName: "Rahim Uddin", role: "MEMBER", status: "active", contributedPaisa: 200000, targetQuotaPaisa: 200000, dueStatus: "paid", telegramUsername: "rahim_u" },
+  { id: "mem-4", userId: "u-karim", displayName: "Karim Sheikh", role: "MEMBER", status: "active", contributedPaisa: 100000, targetQuotaPaisa: 200000, dueStatus: "partial", telegramUsername: "karim_s" },
+  { id: "mem-5", userId: "u-farhan", displayName: "Farhan Ali", role: "MEMBER", status: "suspended", contributedPaisa: 0, targetQuotaPaisa: 200000, dueStatus: "overdue", telegramUsername: "farhan_a" },
 ];
 
 let fallbackTransactions: TransactionRecord[] = [
-  { id: "tx-1", type: "CONTRIBUTION", memberId: "u-adnan", memberName: "Adnan Shahria", description: "Monthly contribution", amountPaisa: 50000, source: "TELEGRAM", date: "2026-10-01", createdBy: "Adnan Shahria", status: "completed" },
-  { id: "tx-2", type: "CONTRIBUTION", memberId: "u-murad", memberName: "Murad Hasan", description: "Monthly contribution", amountPaisa: 50000, source: "TELEGRAM", date: "2026-10-01", createdBy: "Adnan Shahria", status: "completed" },
-  { id: "tx-3", type: "EXPENSE", category: "GROCERY", description: "Weekly grocery from market", amountPaisa: -15000, source: "TELEGRAM", date: "2026-09-30", createdBy: "Adnan Shahria", status: "completed" },
-  { id: "tx-4", type: "EXPENSE", category: "ELECTRICITY", description: "September electricity bill share", amountPaisa: -8000, source: "WEB", date: "2026-09-28", createdBy: "Adnan Shahria", status: "completed" },
+  { id: "tx-1", voucherNo: "VCH-2026-005", type: "CONTRIBUTION", memberId: "u-adnan", memberName: "Adnan Shahria", description: "October monthly dues deposit", category: "DUES", amountPaisa: 200000, paymentMethod: "BKASH", referenceId: "BK-892JK41", source: "TELEGRAM", date: "2026-10-02", createdBy: "Adnan Shahria", status: "completed", receiptUrl: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80" },
+  { id: "tx-2", voucherNo: "VCH-2026-004", type: "EXPENSE", category: "GROCERY", payeeName: "Shwapno Super Shop", description: "Monthly cooking essentials (Rice, Oil, Spices)", amountPaisa: -125000, paymentMethod: "CARD", referenceId: "POS-SHW-9912", source: "WEB", date: "2026-10-01", createdBy: "Adnan Shahria", status: "completed", receiptUrl: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&auto=format&fit=crop&q=80" },
+  { id: "tx-3", voucherNo: "VCH-2026-003", type: "CONTRIBUTION", memberId: "u-murad", memberName: "Murad Hasan", description: "Monthly room contribution", category: "DUES", amountPaisa: 150000, paymentMethod: "NAGAD", referenceId: "NG-7731BA", source: "TELEGRAM", date: "2026-10-01", createdBy: "Adnan Shahria", status: "completed" },
+  { id: "tx-4", voucherNo: "VCH-2026-002", type: "EXPENSE", category: "ELECTRICITY", payeeName: "DESCO Electricity", description: "September electricity utility bill", amountPaisa: -80000, paymentMethod: "BKASH", referenceId: "BK-BILL-5510", source: "WEB", date: "2026-09-28", createdBy: "Adnan Shahria", status: "completed", receiptUrl: "https://images.unsplash.com/photo-1607344645866-009c320b5ab8?w=600&auto=format&fit=crop&q=80" },
+  { id: "tx-5", voucherNo: "VCH-2026-001", type: "EXPENSE", category: "CLEANING", payeeName: "Local Market Store", description: "Floor disinfectant, broom and trash bags", amountPaisa: -35000, paymentMethod: "CASH", referenceId: "CSH-MEMO-12", source: "TELEGRAM", date: "2026-09-25", createdBy: "Adnan Shahria", status: "completed" },
 ];
 
 // ─── Row mappers ──────────────────────────────────────────────────────────────
@@ -162,17 +175,23 @@ export async function getFundSummary(fundId?: string): Promise<FundSummary> {
   const id = fundId ?? FUND_ID;
 
   if (!db) {
-    // Fallback: recalculate from in-memory store
     const contrib = fallbackTransactions.filter(t => t.status === "completed" && t.amountPaisa > 0).reduce((s, t) => s + t.amountPaisa, 0);
     const expenses = fallbackTransactions.filter(t => t.status === "completed" && t.amountPaisa < 0).reduce((s, t) => s + Math.abs(t.amountPaisa), 0);
     fallbackFund = { ...fallbackFund, totalContributionsPaisa: contrib, totalExpensesPaisa: expenses, totalBalancePaisa: fallbackFund.openingBalancePaisa + contrib - expenses, memberCount: fallbackMembers.length };
     return { ...fallbackFund, id };
   }
 
-  await syncMemberCount(db, FUND_ID);
-  const row = await db.prepare("SELECT * FROM fund WHERE id = ?").bind(FUND_ID).first();
-  if (!row) return { ...fallbackFund, id };
-  return rowToFund(row);
+  try {
+    await syncMemberCount(db, FUND_ID);
+    const row = await db.prepare("SELECT * FROM fund WHERE id = ?").bind(FUND_ID).first();
+    if (!row) return { ...fallbackFund, id };
+    return rowToFund(row);
+  } catch {
+    const contrib = fallbackTransactions.filter(t => t.status === "completed" && t.amountPaisa > 0).reduce((s, t) => s + t.amountPaisa, 0);
+    const expenses = fallbackTransactions.filter(t => t.status === "completed" && t.amountPaisa < 0).reduce((s, t) => s + Math.abs(t.amountPaisa), 0);
+    fallbackFund = { ...fallbackFund, totalContributionsPaisa: contrib, totalExpensesPaisa: expenses, totalBalancePaisa: fallbackFund.openingBalancePaisa + contrib - expenses, memberCount: fallbackMembers.length };
+    return { ...fallbackFund, id };
+  }
 }
 
 export async function updateFundSettings(input: {
@@ -242,8 +261,16 @@ export async function getTransactions(params?: {
     binds.push(params.limit);
   }
 
-  const rows = await db.prepare(sql).bind(...binds).all();
-  return (rows.results ?? []).map(rowToTx);
+  try {
+    const rows = await db.prepare(sql).bind(...binds).all();
+    return (rows.results ?? []).map(rowToTx);
+  } catch {
+    let result = [...fallbackTransactions];
+    if (params?.type && params.type !== "ALL") result = result.filter(t => t.type === params.type);
+    result.sort((a, b) => (a.date < b.date ? 1 : -1));
+    if (params?.limit) result = result.slice(0, params.limit);
+    return result;
+  }
 }
 
 export async function createTransaction(input: {
@@ -255,12 +282,19 @@ export async function createTransaction(input: {
   amountPaisa: number;
   source?: "TELEGRAM" | "WEB";
   createdBy?: string;
+  paymentMethod?: PaymentMethod;
+  referenceId?: string;
+  payeeName?: string;
+  receiptUrl?: string;
+  feePaisa?: number;
+  voucherNo?: string;
 }): Promise<TransactionRecord> {
   const db = getDB();
   const isExpense = input.type === "EXPENSE" || input.type === "REVERSAL";
   const signedAmount = isExpense ? -Math.abs(input.amountPaisa) : Math.abs(input.amountPaisa);
   const dateStr = new Date().toISOString().split("T")[0] ?? "2026-10-01";
   const id = `tx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const voucherNo = input.voucherNo || `VCH-2026-${String(fallbackTransactions.length + 1).padStart(3, "0")}`;
 
   let resolvedMemberName = input.memberName;
 
@@ -270,14 +304,35 @@ export async function createTransaction(input: {
       if (found) resolvedMemberName = found.displayName;
     }
     const newTx: TransactionRecord = {
-      id, type: input.type, memberId: input.memberId, memberName: resolvedMemberName,
-      category: input.category, description: input.description, amountPaisa: signedAmount,
-      source: input.source ?? "WEB", date: dateStr, createdBy: input.createdBy ?? "Admin", status: "completed",
+      id,
+      voucherNo,
+      type: input.type,
+      memberId: input.memberId,
+      memberName: resolvedMemberName,
+      payeeName: input.payeeName,
+      category: input.category,
+      description: input.description,
+      amountPaisa: signedAmount,
+      paymentMethod: input.paymentMethod || (input.type === "CONTRIBUTION" ? "BKASH" : "CASH"),
+      referenceId: input.referenceId,
+      receiptUrl: input.receiptUrl,
+      feePaisa: input.feePaisa,
+      source: input.source ?? "WEB",
+      date: dateStr,
+      createdBy: input.createdBy ?? "Admin",
+      status: "completed",
     };
     fallbackTransactions.unshift(newTx);
     if (input.type === "CONTRIBUTION" && resolvedMemberName) {
       const mem = fallbackMembers.find(m => m.displayName.toLowerCase() === resolvedMemberName?.toLowerCase() || m.id === input.memberId);
-      if (mem) mem.contributedPaisa += Math.abs(input.amountPaisa);
+      if (mem) {
+        mem.contributedPaisa += Math.abs(input.amountPaisa);
+        if (mem.targetQuotaPaisa && mem.contributedPaisa >= mem.targetQuotaPaisa) {
+          mem.dueStatus = "paid";
+        } else if (mem.contributedPaisa > 0) {
+          mem.dueStatus = "partial";
+        }
+      }
     }
     return newTx;
   }
@@ -400,8 +455,12 @@ export async function reverseTransaction(
 export async function getMembers(): Promise<MemberRecord[]> {
   const db = getDB();
   if (!db) return [...fallbackMembers];
-  const rows = await db.prepare("SELECT * FROM members ORDER BY display_name ASC").all();
-  return (rows.results ?? []).map(rowToMember);
+  try {
+    const rows = await db.prepare("SELECT * FROM members ORDER BY display_name ASC").all();
+    return (rows.results ?? []).map(rowToMember);
+  } catch {
+    return [...fallbackMembers];
+  }
 }
 
 export async function addMember(input: {

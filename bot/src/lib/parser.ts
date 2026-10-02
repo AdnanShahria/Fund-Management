@@ -36,6 +36,7 @@ export type ParsedIntent =
   | { type: "MEMBERS" }
   | { type: "HELP" }
   | { type: "START" }
+  | { type: "CHAT"; reply: string }
   | {
       type: "CONTRIBUTION";
       memberName: string;
@@ -59,15 +60,21 @@ const EXPENSE_CATEGORIES: Record<string, string> = {
   grocery: "GROCERY",
   groceries: "GROCERY",
   food: "GROCERY",
+  bazar: "GROCERY",
+  bazaar: "GROCERY",
+  khabar: "GROCERY",
   বাজার: "GROCERY",
   electricity: "ELECTRICITY",
   electric: "ELECTRICITY",
+  current: "ELECTRICITY",
   বিদ্যুৎ: "ELECTRICITY",
   cleaning: "CLEANING",
   clean: "CLEANING",
   internet: "INTERNET",
   net: "INTERNET",
+  wifi: "INTERNET",
   transport: "TRANSPORT",
+  bill: "OTHER",
   other: "OTHER",
 };
 
@@ -98,7 +105,7 @@ function extractAmount(raw: string): number | null {
   return Math.round(n * 100); // paisa
 }
 
-/** Simple rule-based parser. Returns null when it cannot parse the message. */
+/** Simple rule based parser. Returns null when it cannot parse the message. */
 export function ruleBasedParse(text: string): ParsedIntent | null {
   const t = text.trim();
 
@@ -125,7 +132,6 @@ export function ruleBasedParse(text: string): ParsedIntent | null {
   const expCmd = t.match(/^\/expense\s+(.*)/i);
   if (expCmd) {
     const parts = (expCmd[1] ?? "").trim().split(/\s+/);
-    // Try number first
     let category = "OTHER";
     let amountPaisa: number | null = null;
 
@@ -149,12 +155,70 @@ export function ruleBasedParse(text: string): ParsedIntent | null {
   }
 
   // ── /reverse <tx-id> ─────────────────────────────────────────────────────
-  const revCmd = t.match(/^\/reverse\s+(\S+)/i);
-  if (revCmd) {
-    const transactionId = (revCmd[1] ?? "").trim();
-    if (transactionId) {
-      return { type: "REVERSE", transactionId };
+  if (t === "/reverse" || t.startsWith("/reverse ")) {
+    const revCmd = t.match(/^\/reverse\s+(\S+)/i);
+    if (revCmd) {
+      const transactionId = (revCmd[1] ?? "").trim();
+      if (transactionId) {
+        return { type: "REVERSE", transactionId };
+      }
     }
+    return {
+      type: "CHAT",
+      reply: "To reverse a mistaken transaction, please provide the transaction ID.\n\nExample: `/reverse tx-285`\n\nYou can find recent transaction IDs by sending `/history`.",
+    };
+  }
+
+  // ── Conversational: Dashboard and web links ──────────────────────────────
+  if (/(?:dashboard|web\s*link|links?|website|site|web\s*app)\b/i.test(t)) {
+    return {
+      type: "CHAT",
+      reply:
+        "Here is your live room fund dashboard:\n" +
+        "https://fvmas16.pages.dev\n\n" +
+        "You can track real time balances, category analytics, and member contributions live. The admin control panel is also available at https://fvmas16.pages.dev/admin.",
+    };
+  }
+
+  // ── Conversational: Readiness or casual status ───────────────────────────
+  if (/^(?:now|what now|ready)\b/i.test(t)) {
+    return {
+      type: "CHAT",
+      reply:
+        "I am ready. You can tell me any expense (like \"bazar 450 tk\"), log a member deposit (like \"Murad gave 500 tk\"), or ask \"what is our balance?\".",
+    };
+  }
+
+  // ── Conversational: Gratitude ────────────────────────────────────────────
+  if (/^(?:thanks|thank\s*you|thx|dhonnobad|ধন্যবাদ)\b/i.test(t)) {
+    return {
+      type: "CHAT",
+      reply: "You are welcome. Let me know whenever you need to record an expense or check the fund.",
+    };
+  }
+
+  // ── Natural language: Balance inquiries ──────────────────────────────────
+  if (
+    /(?:balance|how\s*much\s*(?:money|balance|left)|koto\s*taka|taka\s*koto|balance\s*koto|টাকা\s*কত|ব্যালেন্স)\b/i.test(
+      t
+    )
+  ) {
+    return { type: "BALANCE" };
+  }
+
+  // ── Natural language: Summary or report inquiries ────────────────────────
+  if (/(?:summary|report|breakdown|হিসাব|রিপোর্ট)\b/i.test(t)) {
+    return { type: "SUMMARY" };
+  }
+
+  // ── Natural language: History or recent transaction inquiries ────────────
+  if (/(?:history|recent|transactions|last\s*records|আগের\s*খরচ)\b/i.test(t)) {
+    return { type: "HISTORY" };
+  }
+
+  // ── Natural language: Member list inquiries ──────────────────────────────
+  if (/(?:members|roster|who\s*contributed|member\s*list|মেম্বার)\b/i.test(t)) {
+    return { type: "MEMBERS" };
   }
 
   // ── Natural language: "Murad contributed 200" / "Murad gave 300 tk" ──────
@@ -181,7 +245,27 @@ export function ruleBasedParse(text: string): ParsedIntent | null {
     }
   }
 
-  // ── Natural language: "We spent 150 on electricity" ─────────────────────
+  // ── Natural language expense: Category first (e.g. "bazar 450 tk", "grocery 90 taka") ──
+  const catFirst = t.match(/^([a-zA-Z\u0980-\u09FF]+)\s+([\d০-৯,৳.]+(?:\s*(?:tk|taka|টাকা))?)(.*)?$/i);
+  if (catFirst) {
+    const cat = detectCategory(catFirst[1] ?? "");
+    const amountPaisa = extractAmount(catFirst[2] ?? "");
+    if (cat !== "OTHER" && amountPaisa) {
+      return { type: "EXPENSE", category: cat, amountPaisa, description: t };
+    }
+  }
+
+  // ── Natural language expense: Amount first (e.g. "450 tk bazar", "৩৫০ টাকা বাজার") ──
+  const amtFirst = t.match(/^([\d০-৯,৳.]+(?:\s*(?:tk|taka|টাকা))?)\s+([a-zA-Z\u0980-\u09FF]+)(.*)?$/i);
+  if (amtFirst) {
+    const cat = detectCategory(amtFirst[2] ?? "");
+    const amountPaisa = extractAmount(amtFirst[1] ?? "");
+    if (cat !== "OTHER" && amountPaisa) {
+      return { type: "EXPENSE", category: cat, amountPaisa, description: t };
+    }
+  }
+
+  // ── Natural language expense: "We spent 150 on electricity" ─────────────
   const nlExpense = t.match(
     /(?:spent?|expense|খরচ)\s+([\d,৳.]+(?:\s*(?:tk|taka|টাকা))?)\s*(?:on|for)?\s*([A-Za-z\u0980-\u09FF]*)/i
   );
@@ -193,5 +277,5 @@ export function ruleBasedParse(text: string): ParsedIntent | null {
     }
   }
 
-  return null; // could not parse — caller should try the AI parser
+  return null; // could not parse, caller should try the AI parser
 }

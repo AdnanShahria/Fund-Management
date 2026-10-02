@@ -11,6 +11,7 @@ export interface TelegramUpdate {
 
 export interface TelegramMessage {
   message_id: number;
+  message_thread_id?: number;
   from?: TelegramUser;
   chat: TelegramChat;
   date: number;
@@ -42,6 +43,7 @@ export interface TelegramCallbackQuery {
 
 export interface SendMessagePayload {
   chat_id: number;
+  message_thread_id?: number;
   text: string;
   parse_mode?: "Markdown" | "HTML" | "MarkdownV2";
   reply_markup?: InlineKeyboardMarkup;
