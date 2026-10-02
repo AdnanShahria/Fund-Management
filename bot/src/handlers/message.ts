@@ -28,7 +28,32 @@ interface GroupFundContext {
  */
 export async function handleMessage(msg: TelegramMessage, env: Env): Promise<void> {
   const chatId = msg.chat.id;
-  const text = msg.text?.trim();
+  const rawText = msg.text?.trim();
+
+  if (!rawText) return;
+
+  // In groups, Telegram sends commands as "/cmd@BotUsername".
+  // Strip the @mention suffix so parsers receive clean text like "/cmd".
+  // Also handle messages that start with @BotUsername (e.g. "@OrbitFundBot balance").
+  const botUsername = env.BOT_USERNAME || "OrbitFundBot";
+  const text = rawText
+    .replace(new RegExp(`@${botUsername}`, "gi"), "")
+    .trim();
+
+  // In group/supergroup chats, only respond if:
+  //   (a) the message begins with a / command, or
+  //   (b) the original raw text mentioned @BotUsername
+  //   (c) it is a private chat (DM)
+  // This mirrors Telegram's group privacy mode behavior and prevents the bot
+  // from cluttering groups by replying to every message.
+  const isGroupChat = msg.chat.type === "group" || msg.chat.type === "supergroup";
+  const wasDirectlyAddressed =
+    rawText.toLowerCase().includes(`@${botUsername.toLowerCase()}`) ||
+    rawText.startsWith("/");
+
+  if (isGroupChat && !wasDirectlyAddressed) {
+    return; // Silently ignore — not addressed to this bot
+  }
 
   if (!text) return;
 
@@ -40,32 +65,47 @@ export async function handleMessage(msg: TelegramMessage, env: Env): Promise<voi
     intent = await aiParse(text, env);
   }
 
-  if (!intent || intent.type === "UNKNOWN") {
-    await sendMessage(
-      chatId,
-      "I could not understand that request.\n\n" +
-        "Try one of these commands:\n" +
-        "/balance : check current fund balance\n" +
-        "/summary : see complete fund report\n" +
-        "/history : view recent transactions\n" +
-        "/members : view all members and contributions\n" +
-        "/add Murad 200 : record a member contribution\n" +
-        "/expense 90 grocery : record an expense\n" +
-        "/reverse <id> : reverse a mistaken entry\n" +
-        "/help : view all available commands",
-      env
-    );
-    return;
-  }
-
-  // Handle help or start before group context lookup for instant response
-  if (intent.type === "START") {
+  // Handle help, start, or conversational chat before group context lookup for instant response
+  if (intent?.type === "START") {
     await handleStart(chatId, msg, env);
     return;
   }
 
-  if (intent.type === "HELP") {
+  if (intent?.type === "HELP") {
     await handleHelp(chatId, env);
+    return;
+  }
+
+  if (intent?.type === "CHAT") {
+    let reply = intent.reply;
+    if (/how many group/i.test(text) || /koyta group/i.test(text)) {
+      try {
+        const countRow = await env.DB.prepare(
+          `SELECT COUNT(*) AS total FROM groups WHERE status = 'active'`
+        ).first<{ total: number }>();
+        const total = countRow?.total ?? 1;
+        reply = `I am currently connected to ${total} group${total === 1 ? "" : "s"} in this ledger!\n\nYou can add me to any room, batch, or mess group to manage shared finances and view reports live on the web dashboard.`;
+      } catch {
+        // keep AI reply
+      }
+    }
+    await sendMessage(chatId, reply, env, {
+      message_thread_id: msg.message_thread_id,
+      reply_markup: getDashboardMarkup(env),
+    });
+    return;
+  }
+
+  if (!intent || intent.type === "UNKNOWN") {
+    await sendMessage(
+      chatId,
+      "I am here! You can tell me any expense (like \"bazar 450 tk\"), contribution (like \"Adnan gave 500 tk\"), ask for balance, or send /help to view all commands.",
+      env,
+      {
+        message_thread_id: msg.message_thread_id,
+        reply_markup: getDashboardMarkup(env),
+      }
+    );
     return;
   }
 

@@ -15,3 +15,7 @@ WEB_API_URL = "https://fvmas16.pages.dev"
 DASHBOARD_URL = "https://fvmas16.pages.dev"
 BOT_API_KEY = "orbit_bot_sync_3d81b47e2a90"
 NVIDIA_MODEL = "z-ai/glm-5.3"
+BOT_USERNAME = "OrbitFundBot"
+
+[ai]
+binding = "AI"

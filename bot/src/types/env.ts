@@ -9,6 +9,9 @@ export interface Env {
   // Telegram Bot token from @BotFather, stored as a secret in env
   BOT_TOKEN: string;
 
+  // Telegram bot username (without @) — used to strip mentions in group chats
+  BOT_USERNAME?: string;
+
   // Web API endpoint URL for remote fund ledger synchronization
   WEB_API_URL?: string;
 
