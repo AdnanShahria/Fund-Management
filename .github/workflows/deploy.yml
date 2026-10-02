@@ -175,6 +175,26 @@ jobs:
         working-directory: web
         run: npm run build
 
+      - name: Convert for Cloudflare Pages via next-on-pages
+        working-directory: web
+        run: npx @cloudflare/next-on-pages --skip-build
+
+      - name: Deploy Web Dashboard to Cloudflare Pages
+        if: github.ref == 'refs/heads/main'
+        working-directory: web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || '14666fcfc8a4015d8ff3565860e33002' }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "CLOUDFLARE_API_TOKEN not set in repo secrets. Skipping Pages deploy."
+            echo "To enable: add CLOUDFLARE_API_TOKEN to your repository secrets."
+          else
+            echo "Deploying to Cloudflare Pages project fvmas16..."
+            npx wrangler pages deploy .vercel/output/static --project-name=fvmas16
+            echo "Dashboard deployed successfully."
+          fi
+
   # ── 5. Auto Fetch and Auto Detect Connectivity ────────────────────────────
   detect-live-connections:
     name: Auto Detect Connections and Health Matrix
